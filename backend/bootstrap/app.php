@@ -3,9 +3,9 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use App\Http\Middleware\IsAdmin;
-use App\Http\Middleware\IsPetugas;
-use App\Http\Middleware\IsPeminjam;
+// HAPUS: use App\Http\Middleware\IsAdmin;
+// HAPUS: use App\Http\Middleware\IsPetugas;
+// HAPUS: use App\Http\Middleware\IsPeminjam;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -16,10 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
+            // CUKUP SISAKAN INI SAJA:
             'role' => \App\Http\Middleware\CheckRole::class,
-            'role.admin' => IsAdmin::class,
-            'role.petugas' => IsPetugas::class,
-            'role.peminjam' => IsPeminjam::class
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

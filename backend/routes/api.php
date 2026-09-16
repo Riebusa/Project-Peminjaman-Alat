@@ -10,16 +10,16 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
-    
-    Route::middleware('role.admin')->group(function () {
+
+    Route::middleware('role:admin')->group(function () {
         // Route untuk hak akses admin
     });
 
-    Route::middleware('role.petugas')->group(function () {
+    Route::middleware('role:petugas')->group(function () {
         // Route untuk hak akses petugas
     });
 
-    Route::middleware('role.peminjam')->group(function () {
+    Route::middleware('role:peminjam')->group(function () {
         // Route untuk hak akses peminjam
     });
 });

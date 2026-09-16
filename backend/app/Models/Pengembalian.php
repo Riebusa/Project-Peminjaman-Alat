@@ -10,7 +10,7 @@ class Pengembalian extends Model
     protected $table = 'pengembalian';
 
     protected $fillable = [
-        'peminjam_id', 'tgl_kembali', 'kondisi_kembali', 'denda', 'petugas_id'
+        'peminjaman_id', 'tgl_kembali', 'kondisi_kembali', 'denda', 'petugas_id'
     ];
 
     protected function casts(): array {

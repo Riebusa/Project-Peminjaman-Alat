@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.dev')
 
 @section('title', 'Kelola Alat - Panel Admin')
 @section('header-title', 'Manajemen Data Alat')
@@ -55,7 +55,7 @@
                     <tr class="hover:bg-gray-50 transition">
                         <td class="py-3 px-4 border-b">
                             @if($alat->gambar)
-                                <img src="{{ asset($alat->gambar) }}" alt="{{ $alat->nama_alat }}" class="w-12 h-12 object-cover rounded-lg border">
+                                <img src="{{ asset('storage/' . $alat->gambar) }}" alt="{{ $alat->nama_alat }}" class="w-12 h-12 object-cover rounded-lg border">
                             @else
                                 <span class="text-xs text-gray-400 italic">Tidak ada</span>
                             @endif

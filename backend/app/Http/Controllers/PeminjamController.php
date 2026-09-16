@@ -55,11 +55,62 @@ class PeminjamController extends Controller
     // Melihat riwayat peminjaman user yang sedang login
     public function riwayatPeminjaman()
     {
-        $peminjamans = Peminjaman::with('detailPinjans.alat')
+        $peminjamans = Peminjaman::with('detailPinjam.alat')
             ->where('user_id', auth()->id())
             ->latest()
             ->get();
 
         return view('peminjam.riwayat', compact('peminjamans'));
+    }
+
+    public function prosesPengembalian(Request $request, $id)
+    {
+        // 1. Validasi input dari form pengembalian
+        $request->validate([
+            'kondisi_kembali' => 'required|string',
+            'denda'           => 'nullable|numeric|min:0',
+        ]);
+
+        // 2. Ambil data peminjaman beserta detail alatnya
+        $peminjaman = Peminjaman::with('detailPinjam')->findOrFail($id);
+
+        // Pastikan status peminjaman memang sedang dipinjam
+        // Sesuaikan string 'dipinjam' dengan value status di database Anda
+        if ($peminjaman->status !== 'dipinjam') {
+            return redirect()->back()->with('error', 'Alat tidak sedang dipinjam atau sudah dikembalikan.');
+        }
+
+        DB::beginTransaction();
+        try {
+            // 3. Masukkan data ke tabel pengembalian
+            \App\Models\Pengembalian::create([
+                'peminjaman_id'   => $peminjaman->id,
+                'tgl_kembali'     => now()->toDateString(),
+                'kondisi_kembali' => $request->kondisi_kembali,
+                'denda'           => $request->denda ?? 0,
+                // Asumsi: yang memproses pengembalian adalah petugas yang sedang login
+                'petugas_id'      => auth()->id(), 
+            ]);
+
+            // 4. Ubah status peminjaman menjadi selesai/dikembalikan
+            $peminjaman->update([
+                'status' => 'dikembalikan' 
+            ]);
+
+            // 5. Kembalikan stok alat dengan melakukan looping pada detail pinjam
+            foreach ($peminjaman->detailPinjam as $detail) {
+                $alat = \App\Models\Alat::find($detail->alat_id);
+                if ($alat) {
+                    $alat->increment('stok', $detail->jumlah);
+                }
+            }
+
+            DB::commit();
+            return redirect()->back()->with('success', 'Pengembalian berhasil diproses, stok telah diperbarui.');
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            return redirect()->back()->with('error', 'Gagal memproses pengembalian: ' . $e->getMessage());
+        }
     }
 }

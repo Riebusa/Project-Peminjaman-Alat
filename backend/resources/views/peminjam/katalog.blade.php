@@ -28,7 +28,7 @@
         @endif
 
         <h3 class="mb-3">Katalog Alat Tersedia</h3>
-        <form action="{{ route('peminjam.peminjaman.ajukan') }}" method="POST">
+        <form action="{{ route('peminjam.ajukan_peminjaman') }}" method="POST">
             @csrf
             <div class="card shadow-sm mb-4">
                 <div class="card-body">

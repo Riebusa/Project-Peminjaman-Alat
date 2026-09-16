@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.dev')
 
 @section('title', 'Kelola Peminjaman - Panel Admin')
 @section('header-title', 'Manajemen Transaksi Peminjaman')
@@ -89,13 +89,20 @@
                                 <form action="{{ route('admin.peminjaman.updateStatus', $peminjaman->id) }}" method="POST" class="flex items-center space-x-1">
                                     @csrf
                                     @method('PUT')
-                                    <select name="status" onchange="this.form.submit()" class="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none">
+                                    <select name="status" onchange="this.form.submit()" class="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none w-full">
                                         <option value="diajukan" {{ $peminjaman->status == 'diajukan' ? 'selected' : '' }}>Diajukan</option>
                                         <option value="dipinjam" {{ $peminjaman->status == 'dipinjam' ? 'selected' : '' }}>Dipinjam</option>
-                                        <option value="selesai" {{ $peminjaman->status == 'selesai' ? 'selected' : '' }}>Selesai</option>
+                                        <option value="selesai" {{ $peminjaman->status == 'dikembalikan' ? 'selected' : '' }}>Dikembalikan</option>
                                         <option value="telat" {{ $peminjaman->status == 'telat' ? 'selected' : '' }}>Telat</option>
                                     </select>
                                 </form>
+
+                                <!-- TOMBOL PROSES KEMBALI (Ditambahkan di sini) -->
+                                @if(in_array($peminjaman->status, ['dipinjam', 'telat']))
+                                    <button type="button" onclick="openModal('modalKembali{{ $peminjaman->id }}')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-xs font-semibold transition w-full text-center">
+                                        Proses Kembali
+                                    </button>
+                                @endif
 
                                 <!-- Tombol Hapus -->
                                 <form action="{{ route('admin.peminjaman.destroy', $peminjaman->id) }}" method="POST"
@@ -109,6 +116,55 @@
                             </div>
                         </td>
                     </tr>
+
+                    <!-- MODAL PENGEMBALIAN TAILWIND (Ditambahkan di sini) -->
+                    @if(in_array($peminjaman->status, ['dipinjam', 'telat']))
+                    <div id="modalKembali{{ $peminjaman->id }}" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                            <!-- Background Overlay -->
+                            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeModal('modalKembali{{ $peminjaman->id }}')"></div>
+                            
+                            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                            
+                            <!-- Panel Modal -->
+                            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                                <form action="{{ route('admin.peminjaman.kembali', $peminjaman->id) }}" method="POST">
+                                    @csrf
+                                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Proses Pengembalian Alat</h3>
+                                        <div class="mt-4">
+                                            <p class="text-sm text-gray-500 mb-4">Peminjam: <strong class="text-gray-900">{{ $peminjaman->user->name ?? 'User Dihapus' }}</strong></p>
+                                            
+                                            <div class="mb-4">
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">Kondisi Alat Saat Dikembalikan</label>
+                                                <select name="kondisi_kembali" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500" required>
+                                                    <option value="Lengkap & Baik">Lengkap & Baik</option>
+                                                    <option value="Rusak Ringan">Rusak Ringan</option>
+                                                    <option value="Rusak Berat">Rusak Berat</option>
+                                                    <option value="Hilang">Hilang</option>
+                                                </select>
+                                            </div>
+            
+                                            <div class="mb-2">
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">Denda (Rp) - <i class="text-gray-400 font-normal">Isi 0 jika tidak ada</i></label>
+                                                <input type="number" name="denda" value="0" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500" required>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                                        <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-emerald-600 text-base font-medium text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 sm:ml-3 sm:w-auto sm:text-sm">
+                                            Simpan & Selesaikan
+                                        </button>
+                                        <button type="button" onclick="closeModal('modalKembali{{ $peminjaman->id }}')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                                            Batal
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
+
                     @empty
                     <tr>
                         <td colspan="5" class="py-4 text-center text-gray-500">Belum ada data peminjaman.</td>
@@ -122,4 +178,14 @@
             {{ $peminjamans->links() }}
         </div>
     </div>
+
+    <!-- Script Sederhana untuk Membuka/Menutup Modal -->
+    <script>
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+        }
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+    </script>
 @endsection

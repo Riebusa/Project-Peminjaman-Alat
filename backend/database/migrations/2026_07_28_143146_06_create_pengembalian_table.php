@@ -14,7 +14,7 @@ return new class extends Migration
             $table->date('tgl_kembali');
             $table->string('kondisi_kembali');
             $table->integer('denda')->default(0);
-            $table->foreignId('petugas_id')->constrained('users')->casacadeOnDelete();
+            $table->foreignId('petugas_id')->constrained('users')->cascadeOnDelete();
             $table->timestamps();
         });
     }

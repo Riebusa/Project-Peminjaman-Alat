@@ -10,32 +10,43 @@ use Illuminate\Support\Facades\DB;
 
 class PetugasController extends Controller
 {
-    // Menampilkan daftar pengajuan peminjaman dari siswa/peminjam
+    // 1. TAMBAHAN BARU: Fungsi untuk halaman utama/Dashboard Petugas
+    public function index()
+    {
+        // Petugas butuh melihat ada berapa pengajuan yang harus diurus
+        $peminjamanDiajukan = Peminjaman::where('status', 'diajukan')->count();
+        $peminjamanAktif = Peminjaman::where('status', 'dipinjam')->count();
+
+        return view('petugas.dashboard', compact('peminjamanDiajukan', 'peminjamanAktif'));
+    }
+
     public function indexPeminjaman()
     {
         $peminjamans = Peminjaman::with(['user', 'detailPinjam.alat'])->latest()->get();
-        return view('petugas.peminjaman.index', compact('peminjaman'));
+        // PERBAIKAN: ubah string compact menjadi 'peminjamans'
+        return view('petugas.peminjaman.index', compact('peminjamans'));
     }
 
-    public function setujuPeminjaman($id)
+    // PERBAIKAN: Ubah nama fungsi agar sesuai dengan web.php
+    public function setujuiPeminjaman($id)
     {
         DB::beginTransaction();
         try {
-            $peminjaman = Peminjaman::with('detailPinjams')->findOrFail($id);
+            $peminjaman = Peminjaman::with('detailPinjam')->findOrFail($id);
             $peminjaman->update(['status' => 'dipinjam']);
 
-            // Kurangi stok alat secara otomatis
-            foreach ($peminjaman->detailPinjams as $detail) {
-                $alat = Alat::findOrFail($detail->alat_id);
-                $alat->stok -= $detail->jumlah;
-                $alat->save();
+            foreach ($peminjaman->detailPinjam as $detail) {
+                // PERBAIKAN: Tambahkan lockForUpdate agar aman
+                $alat = Alat::lockForUpdate()->findOrFail($detail->alat_id);
+                $alat->decrement('stok', $detail->jumlah);
             }
 
             DB::commit();
             return redirect()->back()->with('success', 'Peminjaman disetujui dan stok alat dikurangi.');
         } catch (\Exception $e) {
-            DB::rollback();
-            return redirect()->back()->with('error', 'Terjadi kesalahan: ' . $e->gestMessage());
+            DB::rollBack();
+            // PERBAIKAN: typo gestMessage menjadi getMessage
+            return redirect()->back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
     }
 
@@ -50,7 +61,6 @@ class PetugasController extends Controller
         try {
             $peminjaman = Peminjaman::with('detailPinjam')->findOrFail($peminjamanId);
 
-            // Simpan data pengembalian
             Pengembalian::create([
                 'peminjaman_id' => $peminjaman->id,
                 'tgl_kembali' => now(),
@@ -59,21 +69,38 @@ class PetugasController extends Controller
                 'petugas_id' => auth()->id()
             ]);
 
-            // Update status peminjaman jadi selesai
-            $peminjaman->update(['status' => 'selesai']);
+            // PERBAIKAN BUG ENUM: Ubah 'selesai' menjadi 'dikembalikan' sesuai database!
+            $peminjaman->update(['status' => 'dikembalikan']);
 
-            // Kembalikan stok alat kr inventaris
-            foreach ($peminjaman->detailPinjams as $detail) {
-                $alat = Alat::findOrFail($detail->alat_id);
-                $alat->stok += $detail->jumlah;
-                $alat->save();
+            foreach ($peminjaman->detailPinjam as $detail) {
+                // PERBAIKAN: Tambahkan lockForUpdate
+                $alat = Alat::lockForUpdate()->findOrFail($detail->alat_id);
+                $alat->increment('stok', $detail->jumlah);
             }
 
             DB::commit();
             return redirect()->back()->with('success', 'Pengembalian berhasil dicatat dan stok dipulihkan.');
         } catch (\Exception $e) {
-            DB::rollback();
+            DB::rollBack();
             return redirect()->back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
+    }
+
+    // Memanggil halaman daftar alat yang sedang dipinjam (untuk dikembalikan)
+    public function indexPengembalian()
+    {
+        // Hanya tampilkan yang statusnya 'dipinjam' atau 'telat'
+        $peminjamanAktif = Peminjaman::with(['user', 'detailPinjam.alat'])
+                            ->whereIn('status', ['dipinjam', 'telat'])
+                            ->latest()
+                            ->get();
+                            
+        return view('petugas.pengembalian.index', compact('peminjamanAktif'));
+    }
+
+    // Memanggil halaman filter/cetak laporan
+    public function laporan()
+    {
+        return view('petugas.laporan.index');
     }
 }

@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.dev')
 
 @section('title', 'Edit User - Panel Admin')
 @section('header-title', 'Edit Data Pengguna')
