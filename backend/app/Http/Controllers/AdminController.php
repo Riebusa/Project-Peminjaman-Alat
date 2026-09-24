@@ -319,16 +319,26 @@ class AdminController extends Controller
             'password' => 'required|string|min:6',
             'role' => 'required|in:admin,petugas,peminjam',
             'alamat' => 'required|string|max:255',
+            'foto_profil' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
         ]);
 
-        User::create([
+        // 1. Siapkan semua data array termasuk file foto
+        $data = [
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role' => $request->role,
             'no_hp' => $request->no_hp,
             'alamat' => $request->alamat,
-        ]);
+        ];
+
+        // 2. Cek dan proses upload foto jika ada
+        if ($request->hasFile('foto_profil')) {
+            $data['foto_profil'] = $request->file('foto_profil')->store('profil_users', 'public');
+        }
+
+        // 3. Simpan ke database sekali saja secara utuh
+        User::create($data);
 
         return redirect()->route('admin.user.index')->with('success', 'User berhasil ditambahkan.');
     }
@@ -349,6 +359,7 @@ class AdminController extends Controller
             'email' => 'required|string|email|max:255|unique:users,email,' . $id,
             'role' => 'required|in:admin,petugas,peminjam',
             'alamat' => 'required|string|max:255',
+            'foto_profil' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
         ]);
 
         $data = [
@@ -363,6 +374,23 @@ class AdminController extends Controller
             $data['password'] = Hash::make($request->password);
         }
 
+        if ($request->has('hapus_foto') && $request->hapus_foto == '1') {
+            if ($user->foto_profil) {
+                Storage::disk('public')->delete($user->foto_profil);
+            }
+            $data['foto_profil'] = null;
+        }
+
+        // LOGIKA UPLOAD FOTO BARU
+        if ($request->hasFile('foto_profil')) {
+            // Hapus foto lama di folder sebelum ditimpa yang baru
+            if ($user->foto_profil) {
+                Storage::disk('public')->delete($user->foto_profil);
+            }
+            // Simpan foto baru
+            $data['foto_profil'] = $request->file('foto_profil')->store('profil_users', 'public');
+        }
+
         $user->update($data);
 
         return redirect()->route('admin.user.index')->with('success', 'Data user berhasil diperbarui.');
@@ -372,6 +400,10 @@ class AdminController extends Controller
     public function destroyUser($id)
     {
         $user = User::findOrFail($id);
+        // LOGIKA HAPUS FILE FOTO AGAR MEMORI TIDAK PENUH
+        if ($user->foto_profil) {
+            Storage::disk('public')->delete($user->foto_profil);
+        }
         $user->delete();
 
         return redirect()->route('admin.user.index')->with('success', 'User berhasil dihapus.');

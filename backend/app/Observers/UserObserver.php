@@ -10,7 +10,13 @@ class UserObserver
 {
     public function created(User $user)
     {
-        LogAktivitas::create(['user_id' => Auth::id(), 'aktivitas' => "Mendaftarkan user baru: '{$user->name}' (Role: {$user->role})"]);
+        // Hanya catat log jika ada user yang sedang login (dari web, bukan terminal)
+        if (auth()->check()) {
+            LogAktivitas::create([
+                'user_id' => auth()->id(),
+                'aktivitas' => "Mendaftarkan user baru: '{$user->name}' (Role: {$user->role})"
+            ]);
+        }
     }
 
     public function updated(User $user)

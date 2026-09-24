@@ -1,191 +1,165 @@
 @extends('layouts.dev')
 
-@section('title', 'Kelola Peminjaman - Panel Admin')
-@section('header-title', 'Manajemen Transaksi Peminjaman')
+@section('title', 'Kelola Peminjaman')
+@section('header-title', 'Manajemen Persetujuan & Peminjaman Alat')
 
 @section('content')
     @if(session('success'))
-        <div class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-lg shadow-sm text-sm">
-            {{ session('success') }}
-        </div>
+        <div class="mb-4 bg-emerald-50 text-emerald-800 p-4 rounded-lg shadow-sm text-sm border border-emerald-200">{{ session('success') }}</div>
     @endif
     @if(session('error'))
-        <div class="mb-4 bg-red-50 border border-red-200 text-red-800 p-4 rounded-lg shadow-sm text-sm">
-            {{ session('error') }}
-        </div>
+        <div class="mb-4 bg-red-50 text-red-800 p-4 rounded-lg shadow-sm text-sm border border-red-200">{{ session('error') }}</div>
     @endif
 
-    <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
-        <div class="p-5 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
-            <h3 class="text-lg font-bold text-gray-800">Daftar Transaksi Peminjaman</h3>
-
-            <div class="flex items-center gap-3 w-full md:w-auto">
-                <!-- Form Search -->
-                <form action="{{ route('admin.peminjaman.index') }}" method="GET" class="flex w-full md:w-80">
-                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari nama peminjam / status..."
-                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <button type="submit" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 text-sm font-semibold rounded-r-lg transition">
-                        Cari
-                    </button>
-                    @if(request('search'))
-                        <a href="{{ route('admin.peminjaman.index') }}"
-                            class="ml-2 bg-gray-300 hover:bg-gray-400 text-gray-700 px-3 py-2 text-sm rounded-lg flex items-center transition">
-                            Reset
-                        </a>
-                    @endif
-                </form>
-
-                <!-- Tombol Tambah -->
-                <a href="{{ route('admin.peminjaman.create') }}"
-                    class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition whitespace-nowrap">
-                    + Tambah Peminjaman
-                </a>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        
+        <!-- Navigasi Tab Sederhana & Tombol Tambah -->
+        <div class="flex justify-between items-center border-b border-gray-200 bg-gray-50 pr-4">
+            <div class="flex">
+                <button onclick="switchTab('aktif')" id="tab-btn-aktif" class="px-6 py-3 text-sm font-bold text-blue-600 border-b-2 border-blue-600 bg-white transition">
+                    Transaksi Aktif & Menunggu Persetujuan
+                </button>
+                <button onclick="switchTab('selesai')" id="tab-btn-selesai" class="px-6 py-3 text-sm font-bold text-gray-500 border-b-2 border-transparent hover:text-gray-700 transition">
+                    Riwayat Selesai / Ditolak
+                </button>
             </div>
+            
+            <!-- TOMBOL TAMBAH PEMINJAMAN MANUAL -->
+            <a href="{{ route('admin.peminjaman.create') }}" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded transition shadow-sm flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                Tambah Peminjaman
+            </a>
         </div>
 
-        <div class="overflow-x-auto">
+        <!-- TAB 1: Transaksi Aktif -->
+        <div id="tab-aktif" class="p-0 block overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
-                    <tr class="bg-gray-100 text-gray-600 text-sm uppercase tracking-wider">
-                        <th class="py-3 px-4 border-b">Peminjam</th>
-                        <th class="py-3 px-4 border-b">Alat yang Dipinjam</th>
-                        <th class="py-3 px-4 border-b">Tgl Pinjam / Rencana Kembali</th>
-                        <th class="py-3 px-4 border-b">Status</th>
-                        <th class="py-3 px-4 border-b">Aksi</th>
+                    <tr class="bg-white border-b border-gray-200 text-gray-600 text-sm uppercase tracking-wider">
+                        <th class="py-3 px-4 font-semibold">Peminjam</th>
+                        <th class="py-3 px-4 font-semibold">Alat (Jumlah)</th>
+                        <th class="py-3 px-4 font-semibold">Tgl Pinjam - Kembali</th>
+                        <th class="py-3 px-4 font-semibold">Status</th>
+                        <th class="py-3 px-4 font-semibold text-right">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="text-gray-700 text-sm">
-                    @forelse($peminjamans as $peminjaman)
-                    <tr class="hover:bg-gray-50 transition align-top">
-                        <td class="py-3 px-4 border-b font-medium text-gray-900">
-                            {{ $peminjaman->user->name ?? 'User Dihapus' }}
+                <tbody class="text-sm divide-y divide-gray-100">
+                    @forelse($peminjamanAktif as $peminjaman)
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4">
+                            <span class="font-bold text-gray-900">{{ $peminjaman->user->name ?? 'User Dihapus' }}</span>
                         </td>
-                        <td class="py-3 px-4 border-b">
-                            <ul class="list-disc list-inside space-y-1">
+                        <td class="py-3 px-4">
+                            <ul class="list-disc pl-4">
                                 @foreach($peminjaman->detailPinjam as $detail)
-                                    <li>
-                                        <span class="font-semibold">{{ $detail->alat->nama_alat ?? 'Alat Dihapus' }}</span>
-                                        <span class="text-xs bg-gray-200 px-1.5 py-0.5 rounded">({{ $detail->jumlah }} pcs)</span>
-                                    </li>
+                                    <li>{{ $detail->alat->nama_alat ?? 'Dihapus' }} ({{ $detail->jumlah }})</li>
                                 @endforeach
                             </ul>
                         </td>
-                        <td class="py-3 px-4 border-b text-xs text-gray-600">
-                            <span class="block">Pinjam: {{ $peminjaman->tgl_pinjam }}</span>
-                            <span class="block font-semibold">Rencana: {{ $peminjaman->tgl_kembali_plan }}</span>
+                        <td class="py-3 px-4 text-gray-600">
+                            {{ \Carbon\Carbon::parse($peminjaman->tgl_pinjam)->format('d M') }} s/d {{ \Carbon\Carbon::parse($peminjaman->tgl_kembali_plan)->format('d M Y') }}
                         </td>
-                        <td class="py-3 px-4 border-b">
-                            <span class="px-2.5 py-1 text-xs font-semibold rounded-full
-                                @if($peminjaman->status == 'diajukan') bg-yellow-100 text-yellow-800
-                                @elseif($peminjaman->status == 'dipinjam') bg-blue-100 text-blue-800
-                                @elseif($peminjaman->status == 'selesai') bg-emerald-100 text-emerald-800
-                                @else bg-red-100 text-red-800 @endif">
-                                {{ ucfirst($peminjaman->status) }}
+                        <td class="py-3 px-4">
+                            <span class="px-2.5 py-1 text-xs font-bold rounded-md uppercase 
+                                {{ $peminjaman->status == 'diajukan' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800' }}">
+                                {{ str_replace('_', ' ', $peminjaman->status) }}
                             </span>
                         </td>
-                        <td class="py-3 px-4 border-b">
-                            <div class="flex flex-col space-y-2">
-                                <!-- Form Ubah Status Cepat -->
-                                <form action="{{ route('admin.peminjaman.updateStatus', $peminjaman->id) }}" method="POST" class="flex items-center space-x-1">
-                                    @csrf
-                                    @method('PUT')
-                                    <select name="status" onchange="this.form.submit()" class="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none w-full">
-                                        <option value="diajukan" {{ $peminjaman->status == 'diajukan' ? 'selected' : '' }}>Diajukan</option>
-                                        <option value="dipinjam" {{ $peminjaman->status == 'dipinjam' ? 'selected' : '' }}>Dipinjam</option>
-                                        <option value="selesai" {{ $peminjaman->status == 'dikembalikan' ? 'selected' : '' }}>Dikembalikan</option>
-                                        <option value="telat" {{ $peminjaman->status == 'telat' ? 'selected' : '' }}>Telat</option>
-                                    </select>
-                                </form>
+                        <td class="py-3 px-4 text-right">
+                            @if($peminjaman->status == 'diajukan')
+                                <div class="flex flex-col gap-1 items-end">
+                                    <form action="{{ route('admin.peminjaman.setujui', $peminjaman->id) }}" method="POST">
+                                        @csrf
+                                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded font-bold w-full">Setujui</button>
+                                    </form>
+                                    <form action="{{ route('admin.peminjaman.tolak', $peminjaman->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menolak?')">
+                                        @csrf
+                                        <button type="submit" class="bg-red-50 text-red-600 border border-red-200 text-xs px-3 py-1.5 rounded font-bold w-full">Tolak</button>
+                                    </form>
+                                </div>
+                            @else
+                                <span class="text-xs text-gray-400 italic">Lihat di menu Pengembalian</span>
+                            @endif
 
-                                <!-- TOMBOL PROSES KEMBALI (Ditambahkan di sini) -->
-                                @if(in_array($peminjaman->status, ['dipinjam', 'telat']))
-                                    <button type="button" onclick="openModal('modalKembali{{ $peminjaman->id }}')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-xs font-semibold transition w-full text-center">
-                                        Proses Kembali
-                                    </button>
-                                @endif
-
-                                <!-- Tombol Hapus -->
-                                <form action="{{ route('admin.peminjaman.destroy', $peminjaman->id) }}" method="POST"
-                                    onsubmit="return confirm('Yakin ingin menghapus data peminjaman ini?')">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs font-semibold transition w-full">
-                                        Hapus
-                                    </button>
-                                </form>
-                            </div>
+                            <form action="{{ route('admin.peminjaman.destroy', $peminjaman->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus transaksi ini? Jika alat sudah berstatus dipinjam, stok akan otomatis dikembalikan ke gudang.')" class="w-full mt-1">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 border border-gray-300 hover:border-red-300 text-xs px-3 py-1.5 rounded font-bold w-full transition flex items-center justify-center gap-1">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    Hapus
+                                </button>
+                            </form>
                         </td>
                     </tr>
-
-                    <!-- MODAL PENGEMBALIAN TAILWIND (Ditambahkan di sini) -->
-                    @if(in_array($peminjaman->status, ['dipinjam', 'telat']))
-                    <div id="modalKembali{{ $peminjaman->id }}" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-                        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                            <!-- Background Overlay -->
-                            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeModal('modalKembali{{ $peminjaman->id }}')"></div>
-                            
-                            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-                            
-                            <!-- Panel Modal -->
-                            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                                <form action="{{ route('admin.peminjaman.kembali', $peminjaman->id) }}" method="POST">
-                                    @csrf
-                                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Proses Pengembalian Alat</h3>
-                                        <div class="mt-4">
-                                            <p class="text-sm text-gray-500 mb-4">Peminjam: <strong class="text-gray-900">{{ $peminjaman->user->name ?? 'User Dihapus' }}</strong></p>
-                                            
-                                            <div class="mb-4">
-                                                <label class="block text-sm font-medium text-gray-700 mb-1">Kondisi Alat Saat Dikembalikan</label>
-                                                <select name="kondisi_kembali" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500" required>
-                                                    <option value="Lengkap & Baik">Lengkap & Baik</option>
-                                                    <option value="Rusak Ringan">Rusak Ringan</option>
-                                                    <option value="Rusak Berat">Rusak Berat</option>
-                                                    <option value="Hilang">Hilang</option>
-                                                </select>
-                                            </div>
-            
-                                            <div class="mb-2">
-                                                <label class="block text-sm font-medium text-gray-700 mb-1">Denda (Rp) - <i class="text-gray-400 font-normal">Isi 0 jika tidak ada</i></label>
-                                                <input type="number" name="denda" value="0" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500" required>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                                        <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-emerald-600 text-base font-medium text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 sm:ml-3 sm:w-auto sm:text-sm">
-                                            Simpan & Selesaikan
-                                        </button>
-                                        <button type="button" onclick="closeModal('modalKembali{{ $peminjaman->id }}')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-                                            Batal
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                    @endif
-
                     @empty
-                    <tr>
-                        <td colspan="5" class="py-4 text-center text-gray-500">Belum ada data peminjaman.</td>
-                    </tr>
+                    <tr><td colspan="5" class="py-8 text-center text-gray-500">Tidak ada transaksi aktif.</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
 
-        <div class="p-4 border-t border-gray-200 bg-gray-50">
-            {{ $peminjamans->links() }}
+        <!-- TAB 2: Transaksi Selesai -->
+        <div id="tab-selesai" class="p-0 hidden overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-50 border-b border-gray-200 text-gray-600 text-sm uppercase tracking-wider">
+                        <th class="py-3 px-4 font-semibold">Peminjam</th>
+                        <th class="py-3 px-4 font-semibold">Alat (Jumlah)</th>
+                        <th class="py-3 px-4 font-semibold">Status Akhir</th>
+                        <!-- Tambahkan Kolom Aksi -->
+                        <th class="py-3 px-4 font-semibold text-right">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="text-sm divide-y divide-gray-100">
+                    @forelse($peminjamanSelesai as $peminjaman)
+                    <tr class="hover:bg-gray-50">
+                        <td class="py-3 px-4 font-bold text-gray-900">{{ $peminjaman->user->name ?? 'User Dihapus' }}</td>
+                        <td class="py-3 px-4">
+                            <ul class="list-disc pl-4">
+                                @foreach($peminjaman->detailPinjam as $detail)
+                                    <li>{{ $detail->alat->nama_alat ?? 'Dihapus' }} ({{ $detail->jumlah }})</li>
+                                @endforeach
+                            </ul>
+                        </td>
+                        <td class="py-3 px-4">
+                            <span class="px-2.5 py-1 text-xs font-bold rounded-md uppercase 
+                                {{ $peminjaman->status == 'dikembalikan' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800' }}">
+                                {{ $peminjaman->status }}
+                            </span>
+                        </td>
+                        <!-- Tambahkan Tombol Hapus -->
+                        <td class="py-3 px-4 text-right">
+                            <form action="{{ route('admin.peminjaman.destroy', $peminjaman->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus riwayat ini secara permanen?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-end gap-1 ml-auto">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    Hapus
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr><td colspan="4" class="py-8 text-center text-gray-500">Belum ada riwayat selesai.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
     </div>
 
-    <!-- Script Sederhana untuk Membuka/Menutup Modal -->
+    <!-- Script Sederhana untuk Tab -->
     <script>
-        function openModal(modalId) {
-            document.getElementById(modalId).classList.remove('hidden');
-        }
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.add('hidden');
+        function switchTab(tab) {
+            document.getElementById('tab-aktif').classList.toggle('hidden', tab !== 'aktif');
+            document.getElementById('tab-selesai').classList.toggle('hidden', tab !== 'selesai');
+            
+            document.getElementById('tab-btn-aktif').className = tab === 'aktif' 
+                ? 'px-6 py-3 text-sm font-bold text-blue-600 border-b-2 border-blue-600 bg-white' 
+                : 'px-6 py-3 text-sm font-bold text-gray-500 border-b-2 border-transparent hover:text-gray-700 bg-gray-50';
+                
+            document.getElementById('tab-btn-selesai').className = tab === 'selesai' 
+                ? 'px-6 py-3 text-sm font-bold text-blue-600 border-b-2 border-blue-600 bg-white' 
+                : 'px-6 py-3 text-sm font-bold text-gray-500 border-b-2 border-transparent hover:text-gray-700 bg-gray-50';
         }
     </script>
 @endsection

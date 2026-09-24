@@ -9,9 +9,19 @@ use Illuminate\Support\Facades\Auth;
 class KategoriObserver
 {
     public function created(Kategori $kategori)
-    {
-        LogAktivitas::create(['user_id' => Auth::id(), 'aktivitas' => "Menambahkan kategori baru: '{$kategori->nama_kategori}'"]);
+{
+        if (auth()->check()) {
+            LogAktivitas::create([
+                'user_id' => auth()->id(),
+                'aktivitas' => "Menambahkan kategori baru: '{$kategori->nama_kategori}'"
+            ]);
+        }
     }
+
+    // public function created(Kategori $kategori)
+    // {
+    //     LogAktivitas::create(['user_id' => Auth::id(), 'aktivitas' => "Menambahkan kategori baru: '{$kategori->nama_kategori}'"]);
+    // }
 
     public function updated(Kategori $kategori)
     {

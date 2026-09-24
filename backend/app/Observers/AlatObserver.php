@@ -21,8 +21,18 @@ class AlatObserver
 
     public function created(Alat $alat)
     {
-        $this->catatLog("Menambahkan data alat baru: '{$alat->nama_alat}'");
+        if (auth()->check()) {
+            LogAktivitas::create([
+                'user_id' => auth()->id(),
+                'aktivitas' => "Menambahkan alat baru: '{$alat->nama_alat}'"
+            ]);
+        }
     }
+
+    // public function created(Alat $alat)
+    // {
+    //     $this->catatLog("Menambahkan data alat baru: '{$alat->nama_alat}'");
+    // }
 
     public function updated(Alat $alat)
     {

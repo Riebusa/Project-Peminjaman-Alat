@@ -10,8 +10,17 @@ class PeminjamanObserver
 {
     public function created(Peminjaman $peminjaman)
     {
-        LogAktivitas::create(['user_id' => Auth::id(), 'aktivitas' => "Membuat transaksi peminjaman baru (ID: #TRX-{$peminjaman->id})"]);
+        if (auth()->check()) {
+            LogAktivitas::create([
+                'user_id' => auth()->id(),
+                'aktivitas' => "Membuat peminjaman baru ({$peminjaman->id})"
+            ]);
+        }
     }
+    // public function created(Peminjaman $peminjaman)
+    // {
+    //     LogAktivitas::create(['user_id' => Auth::id(), 'aktivitas' => "Membuat transaksi peminjaman baru (ID: #TRX-{$peminjaman->id})"]);
+    // }
 
     public function updated(Peminjaman $peminjaman)
     {

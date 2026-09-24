@@ -5,7 +5,8 @@
 
 @section('content')
 <div class="max-w-xl bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-    <form action="{{ route('admin.user.store') }}" method="POST">
+    <!-- PERHATIKAN: Tambahan enctype="multipart/form-data" wajib untuk upload file -->
+    <form action="{{ route('admin.user.store') }}" method="POST" enctype="multipart/form-data">
         @csrf
 
         <div class="mb-4">
@@ -38,17 +39,27 @@
             </select>
         </div>
 
-        <div class="mb-6">
+        <div class="mb-4">
             <label class="block text-gray-700 text-sm font-semibold mb-2">No. HP (Opsional)</label>
             <input type="text" name="no_hp" value="{{ old('no_hp') }}"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
 
-        <div class="mb-6">
+        <div class="mb-4">
             <label class="block text-gray-700 text-sm font-semibold mb-2">Alamat</label>
             <input type="text" name="alamat" value="{{ old('alamat') }}" required
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
             @error('alamat') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+        </div>
+
+        <!-- INPUT FOTO PROFIL BARU -->
+        <div class="mb-6">
+            <label class="block text-gray-700 text-sm font-semibold mb-2">Foto Profil (Opsional)</label>
+            <!-- Menggunakan style yang persis sama, dengan tambahan text-sm dan background white -->
+            <input type="file" name="foto_profil" accept="image/jpeg,image/png,image/jpg,image/webp" 
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+            <p class="text-xs text-gray-500 mt-1">Format: JPG, PNG, WEBP. Maksimal ukuran 2MB.</p>
+            @error('foto_profil') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
         </div>
 
         <div class="flex justify-end space-x-2">

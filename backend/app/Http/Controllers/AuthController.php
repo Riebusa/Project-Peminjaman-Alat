@@ -27,8 +27,7 @@ class AuthController extends Controller
             } elseif ($user->role === 'petugas') {
                 return redirect()->route('petugas.peminjaman.index');
             } elseif ($user->role === 'peminjam') {
-                // UBAH BARIS DI BAWAH INI
-                return redirect()->route('peminjam.kategori_alat');
+                return redirect()->route('peminjam.katalog');
             }
 
             Auth::logout();

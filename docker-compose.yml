@@ -32,7 +32,6 @@ services:
     networks:
       - API-UJIKOM
     
-  
   # 3. SERVER UI DATABASE (PHPMYADMIN)
   phpMyadmin:
     image: phpmyadmin
