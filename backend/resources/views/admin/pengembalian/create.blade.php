@@ -1,7 +1,7 @@
 @extends('layouts.dev')
 
-@section('title', 'Tambah Pengembalian Manual - Panel Admin')
-@section('header-title', 'Form Pengembalian Alat Manual')
+@section('title', 'Tambah Pengembalian - Panel Admin')
+@section('header-title', 'Form Pengembalian Alat')
 
 @section('content')
 <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">

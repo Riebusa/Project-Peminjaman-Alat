@@ -399,6 +399,11 @@ class AdminController extends Controller
     // Menghapus user
     public function destroyUser($id)
     {
+        // PENCEGAHAN: Admin tidak boleh menghapus akunnya sendiri
+        if ($id == auth()->id()) {
+            return redirect()->route('admin.user.index')->with('error', 'Aksi ditolak! Anda tidak dapat menghapus akun Anda sendiri yang sedang aktif.');
+        }
+
         $user = User::findOrFail($id);
         // LOGIKA HAPUS FILE FOTO AGAR MEMORI TIDAK PENUH
         if ($user->foto_profil) {
