@@ -7,6 +7,7 @@ use App\Http\Controllers\KelolaPengembalianController;
 use App\Http\Controllers\PetugasController;
 use App\Http\Controllers\PeminjamController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ProfilController;
 
 // Halaman Utama / Landing
 Route::get('/', function () {
@@ -93,7 +94,15 @@ Route::middleware(['auth', 'role:peminjam'])->prefix('peminjam')->name('peminjam
     Route::delete('/batalkan/{id}', [PeminjamController::class, 'batalkanPeminjaman'])->name('batalkan');
 });
 
-// 4. AUTHENTICATION & LOGOUT
+// 4. PROFIL (semua role)
+Route::middleware(['auth', 'role:admin,petugas,peminjam'])->prefix('profil')->name('profil.')->group(function () {
+    Route::get('/', [ProfilController::class, 'show'])->name('show');
+    Route::put('/', [ProfilController::class, 'update'])->name('update');
+    Route::put('/email', [ProfilController::class, 'updateEmail'])->name('email');
+    Route::put('/password', [ProfilController::class, 'updatePassword'])->name('password');
+});
+
+// 5. AUTHENTICATION & LOGOUT
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [AuthController::class, 'login']);

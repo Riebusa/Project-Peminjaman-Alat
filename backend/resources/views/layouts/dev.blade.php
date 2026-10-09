@@ -80,6 +80,14 @@
                     Cetak Laporan</a>
                     
                 @endif
+
+                <!-- MENU PROFIL (semua role) -->
+                <div class="pt-4 pb-2 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Akun
+                </div>
+                <a href="{{ route('profil.show') }}" class="block px-4 py-2 rounded-lg transition
+                {{ request()->routeIs('profil.*') ? 'bg-gray-800 text-white font-medium shadow' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
+                Profil Saya</a>
             </nav>
             
             <div class="p-4 border-t border-gray-800 text-sm text-gray-400">

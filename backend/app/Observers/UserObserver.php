@@ -15,8 +15,13 @@ class UserObserver
     public function updated(User $user): void
     {
         $perubahan = $user->getChanges();
-        // Jangan catat password dan token demi keamanan
-        unset($perubahan['updated_at'], $perubahan['password'], $perubahan['remember_token']);
+        unset($perubahan['updated_at'], $perubahan['remember_token']);
+
+        // Ganti password: catat kejadiannya, jangan pernah nilainya
+        if (array_key_exists('password', $perubahan)) {
+            LogAktivitas::catat("Mengganti password akun '{$user->name}'");
+            unset($perubahan['password']);
+        }
 
         // Perubahan status aktif dicatat dengan kalimat khusus
         if (array_key_exists('is_active', $perubahan)) {

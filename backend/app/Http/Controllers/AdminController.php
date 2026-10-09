@@ -206,8 +206,14 @@ class AdminController extends Controller
         return redirect()->route('admin.user.index')->with('success', 'User berhasil ditambahkan.');
     }
 
-    public function editUser($id)
+        public function editUser($id)
     {
+        // Akun sendiri diubah lewat menu Profil
+        if ((int) $id === auth()->id()) {
+            return redirect()->route('profil.show')
+                ->with('error', 'Gunakan menu Profil untuk mengubah data akun Anda sendiri.');
+        }
+
         $user = User::findOrFail($id);
         return view('admin.user.edit', compact('user'));
     }
@@ -215,6 +221,12 @@ class AdminController extends Controller
     // Memperbarui data user
     public function updateUser(Request $request, $id)
     {
+        // Akun sendiri diubah lewat menu Profil (sekaligus mencegah admin mengubah role-nya sendiri)
+        if ((int) $id === auth()->id()) {
+            return redirect()->route('profil.show')
+                ->with('error', 'Gunakan menu Profil untuk mengubah data akun Anda sendiri.');
+        }
+
         $user = User::findOrFail($id);
 
         $request->validate([

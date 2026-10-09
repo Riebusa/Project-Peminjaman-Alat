@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 text-gray-800 font-sans antialiased">
-    
+
     <!-- TOP NAVIGATION BAR (NAVBAR) -->
     <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -21,21 +21,25 @@
                     <!-- Menu Link -->
                     <div class="hidden sm:ml-8 sm:flex sm:space-x-6">
                         <!-- Gunakan Request::routeIs untuk membuat efek menu aktif/menyala -->
-                        <a href="{{ route('peminjam.katalog') }}" 
+                        <a href="{{ route('peminjam.katalog') }}"
                            class="{{ request()->routeIs('peminjam.katalog') ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' }} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-semibold transition">
                             Katalog Alat
                         </a>
-                        <a href="{{ route('peminjam.riwayat') }}" 
+                        <a href="{{ route('peminjam.riwayat') }}"
                            class="{{ request()->routeIs('peminjam.riwayat') ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' }} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-semibold transition">
                             Riwayat Peminjaman
                         </a>
+                        <a href="{{ route('profil.show') }}"
+                           class="{{ request()->routeIs('profil.*') ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' }} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-semibold transition">
+                            Profil Saya
+                        </a>
                     </div>
                 </div>
-                
+
                 <!-- Kanan: Profil & Logout -->
                 <div class="flex items-center gap-4">
-                    <!-- Tampilkan Foto Profil Peminjam jika ada (Bisa pakai Inisial jika tidak) -->
-                    <div class="hidden sm:flex items-center gap-2">
+                    <!-- Foto Profil + nama (klik untuk membuka halaman profil) -->
+                    <a href="{{ route('profil.show') }}" class="hidden sm:flex items-center gap-2 hover:opacity-80 transition">
                         @if(auth()->user()->foto_profil)
                             <img src="{{ asset('storage/' . auth()->user()->foto_profil) }}" alt="Avatar" class="h-8 w-8 rounded-full object-cover border border-gray-200">
                         @else
@@ -44,7 +48,7 @@
                             </div>
                         @endif
                         <span class="text-sm font-semibold text-gray-700">{{ auth()->user()->name ?? 'Peminjam' }}</span>
-                    </div>
+                    </a>
 
                     <!-- Tombol Logout -->
                     <form action="{{ route('logout') }}" method="POST">
@@ -69,6 +73,6 @@
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10">
         @yield('content')
     </main>
-    
+
 </body>
 </html>

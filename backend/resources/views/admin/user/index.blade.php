@@ -65,6 +65,7 @@
                         <!-- KOLOM DATA PENGGUNA (FOTO, NAMA, EMAIL) -->
                         <td class="py-3 px-6">
                             <div class="flex items-center gap-3">
+                                <!-- Logika Foto / Inisial Nama -->
                                 @if($user->foto_profil)
                                     <img src="{{ asset('storage/' . $user->foto_profil) }}" alt="Avatar" class="h-10 w-10 rounded-full object-cover border border-gray-200 shadow-sm flex-shrink-0">
                                 @else
@@ -85,6 +86,7 @@
                             </div>
                         </td>
 
+                        <!-- KOLOM ROLE -->
                         <td class="py-3 px-6 align-middle">
                             <span class="px-2.5 py-1 text-xs font-semibold rounded-full
                                 @if($user->role == 'admin') bg-purple-100 text-purple-800
@@ -105,18 +107,23 @@
 
                         <td class="py-3 px-6 align-middle text-gray-600">{{ $user->no_hp ?? '-' }}</td>
 
+                        <!-- KOLOM AKSI -->
                         <td class="py-3 px-6 align-middle text-right">
                             <div class="flex items-center justify-end space-x-2">
-                                <!-- Tombol Edit -->
-                                <a href="{{ route('admin.user.edit', $user->id) }}"
-                                    class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm">
-                                    Edit
-                                </a>
-
                                 @if($akunSendiri)
-                                    <!-- Akun sendiri: tidak bisa dinonaktifkan atau dihapus -->
+                                    <!-- Akun sendiri: diubah lewat Profil, tidak bisa dinonaktifkan atau dihapus -->
+                                    <a href="{{ route('profil.show') }}"
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm">
+                                        Profil Saya
+                                    </a>
                                     <span class="text-xs text-gray-400 italic px-1">Akun Anda</span>
                                 @else
+                                    <!-- Tombol Edit -->
+                                    <a href="{{ route('admin.user.edit', $user->id) }}"
+                                        class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm">
+                                        Edit
+                                    </a>
+
                                     <!-- Tombol Aktifkan / Nonaktifkan -->
                                     <form action="{{ route('admin.user.toggle', $user->id) }}" method="POST"
                                           onsubmit="return confirm('{{ $user->is_active ? 'Nonaktifkan akun ini? User tidak akan bisa login.' : 'Aktifkan kembali akun ini?' }}')">
