@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Alat;
 use App\Models\Peminjaman;
+use App\Services\PeminjamanService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -26,37 +27,22 @@ class KelolaPeminjamanController extends Controller
         return view('admin.peminjaman.index', compact('peminjamanAktif', 'peminjamanSelesai'));
     }
 
-    // Konfirmasi Peminjaman (Dari Diajukan -> Dipinjam)
-    public function setujui($id)
+    public function setujui($id, PeminjamanService $service)
     {
-        $peminjaman = Peminjaman::findOrFail($id);
-        if ($peminjaman->status === 'diajukan') {
-            $peminjaman->update(['status' => 'dipinjam']);
-            return back()->with('success', 'Peminjaman disetujui. Alat siap diserahkan.');
+        try {
+            $service->setujui((int) $id);
+            return back()->with('success', 'Peminjaman disetujui, stok alat dikurangi. Alat siap diserahkan.');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Gagal menyetujui: ' . $e->getMessage());
         }
-        return back()->with('error', 'Status tidak valid.');
     }
 
-    // Tolak Peminjaman (Dari Diajukan -> Ditolak)
-    public function tolak($id)
+    public function tolak($id, PeminjamanService $service)
     {
-        $peminjaman = Peminjaman::with('detailPinjam')->findOrFail($id);
-        
-        DB::beginTransaction();
         try {
-            $peminjaman->update(['status' => 'ditolak']);
-            
-            // Kembalikan stok karena batal dipinjam
-            foreach ($peminjaman->detailPinjam as $detail) {
-                $alat = Alat::lockForUpdate()->find($detail->alat_id);
-                if ($alat) {
-                    $alat->increment('stok', $detail->jumlah);
-                }
-            }
-            DB::commit();
-            return back()->with('success', 'Peminjaman ditolak dan stok dikembalikan.');
+            $service->tolak((int) $id);
+            return back()->with('success', 'Peminjaman ditolak.');
         } catch (\Exception $e) {
-            DB::rollback();
             return back()->with('error', 'Gagal menolak: ' . $e->getMessage());
         }
     }

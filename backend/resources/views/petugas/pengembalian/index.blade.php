@@ -45,6 +45,9 @@
                     <td class="px-6 py-4 align-top">
                         <span class="font-mono text-sm font-bold text-slate-700 block">#TRX-{{ $pinjam->id }}</span>
                         <span class="text-xs text-slate-500">Mulai: {{ \Carbon\Carbon::parse($pinjam->tgl_pinjam)->translatedFormat('d M Y') }}</span>
+                        @if($pinjam->status === 'menunggu_pengembalian')
+                            <span class="mt-1 inline-block bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded border border-purple-200 uppercase">Diminta peminjam</span>
+                        @endif
                     </td>
                     <td class="px-6 py-4 align-top">
                         <p class="text-sm font-bold text-slate-800">{{ $pinjam->user->name ?? 'User Terhapus' }}</p>
@@ -108,7 +111,7 @@
                 <!-- Peringatan Keterlambatan (Muncul Otomatis via JS jika telat) -->
                 <div id="alertTelat" class="hidden mb-4 bg-red-50 border-l-4 border-red-500 p-3 rounded">
                     <p class="text-xs text-red-700 font-bold mb-1">⚠️ TRANSAKSI TERLAMBAT</p>
-                    <p class="text-xs text-red-600">Peminjam telat <span id="textHariTelat"></span> hari. Pastikan menagih denda jika ada aturan yang berlaku.</p>
+                    <p class="text-xs text-red-600">Peminjam telat <span id="textHariTelat"></span> hari. Denda keterlambatan (Rp 1.000/hari) dihitung otomatis saat disimpan.</p>
                 </div>
 
                 <div class="mb-4">
@@ -117,10 +120,10 @@
                 </div>
                 
                 <div class="mb-5">
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">Denda (Jika Ada)</label>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Denda Kerusakan (Jika Ada)</label>
                     <div class="relative">
                         <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500 text-sm">Rp</span>
-                        <input type="number" name="denda" value="0" min="0" class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
+                        <input type="number" name="denda_kerusakan" value="0" min="0" class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
                     </div>
                 </div>
                 

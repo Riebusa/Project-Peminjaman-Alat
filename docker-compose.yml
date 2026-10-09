@@ -31,6 +31,21 @@ services:
       - mysql-server
     networks:
       - API-UJIKOM
+
+  # SCHEDULER (menjalankan jadwal artisan)
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: laravel-scheduler
+    working_dir: /var/www
+    volumes:
+      - ./backend:/var/www
+    command: php artisan schedule:work
+    depends_on:
+      - mysql-server
+    networks:
+      - API-UJIKOM
     
   # 3. SERVER UI DATABASE (PHPMYADMIN)
   phpMyadmin:
