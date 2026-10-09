@@ -57,8 +57,12 @@
                 <!-- MENU KHUSUS PETUGAS -->
                 <!-- ========================================== -->
                 @elseif(auth()->user()->role === 'petugas')
-                    
-                    <a href="{{ route('petugas.dashboard') }}" class="block px-4 py-2 rounded-lg transition 
+                    @php
+                        $badgeAjuan = \App\Models\Peminjaman::where('status', 'diajukan')->count();
+                        $badgeKembali = \App\Models\Peminjaman::where('status', 'menunggu_pengembalian')->count();
+                    @endphp
+
+                    <a href="{{ route('petugas.dashboard') }}" class="block px-4 py-2 rounded-lg transition
                     {{ request()->routeIs('petugas.dashboard') ? 'bg-gray-800 text-white font-medium shadow' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
                     Dashboard</a>
 
@@ -67,18 +71,26 @@
                         Tugas Operasional
                     </div>
 
-                    <a href="{{ route('petugas.peminjaman.index') }}" class="block px-4 py-2 rounded-lg transition 
+                    <a href="{{ route('petugas.peminjaman.index') }}" class="flex items-center justify-between px-4 py-2 rounded-lg transition
                     {{ request()->routeIs('petugas.peminjaman*') ? 'bg-gray-800 text-white font-medium shadow' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
-                    Persetujuan Peminjaman</a>
+                        <span>Persetujuan Peminjaman</span>
+                        @if($badgeAjuan > 0)
+                            <span class="bg-red-500 text-white text-[10px] font-bold rounded-full px-2 py-0.5">{{ $badgeAjuan }}</span>
+                        @endif
+                    </a>
 
-                    <a href="{{ route('petugas.pengembalian.index') }}" class="block px-4 py-2 rounded-lg transition 
+                    <a href="{{ route('petugas.pengembalian.index') }}" class="flex items-center justify-between px-4 py-2 rounded-lg transition
                     {{ request()->routeIs('petugas.pengembalian*') ? 'bg-gray-800 text-white font-medium shadow' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
-                    Kelola Pengembalian</a>
+                        <span>Kelola Pengembalian</span>
+                        @if($badgeKembali > 0)
+                            <span class="bg-purple-500 text-white text-[10px] font-bold rounded-full px-2 py-0.5">{{ $badgeKembali }}</span>
+                        @endif
+                    </a>
 
-                    <a href="{{ route('petugas.laporan.index') }}" class="block px-4 py-2 rounded-lg transition 
+                    <a href="{{ route('petugas.laporan.index') }}" class="block px-4 py-2 rounded-lg transition
                     {{ request()->routeIs('petugas.laporan*') ? 'bg-gray-800 text-white font-medium shadow' : 'text-gray-400 hover:bg-gray-800 hover:text-white' }}">
                     Cetak Laporan</a>
-                    
+
                 @endif
 
                 <!-- MENU PROFIL (semua role) -->

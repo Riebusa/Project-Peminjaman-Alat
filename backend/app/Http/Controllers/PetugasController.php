@@ -10,7 +10,8 @@ use Illuminate\Support\Collection;
 
 class PetugasController extends Controller
 {
-    private const STATUS_LAPORAN = [
+    // Dipakai untuk tab filter persetujuan dan filter laporan
+    private const STATUS_FILTER = [
         'semua', 'diajukan', 'dipinjam', 'telat',
         'menunggu_pengembalian', 'dikembalikan', 'ditolak',
     ];
@@ -18,17 +19,33 @@ class PetugasController extends Controller
     // Dashboard Petugas
     public function index()
     {
-        // Petugas butuh melihat ada berapa pengajuan yang harus diurus
-        $peminjamanDiajukan = Peminjaman::where('status', 'diajukan')->count();
-        $peminjamanAktif = Peminjaman::whereIn('status', ['dipinjam', 'telat'])->count();
-
-        return view('petugas.dashboard', compact('peminjamanDiajukan', 'peminjamanAktif'));
+        return view('petugas.dashboard', [
+            'peminjamanDiajukan'   => Peminjaman::where('status', 'diajukan')->count(),
+            'peminjamanAktif'      => Peminjaman::whereIn('status', ['dipinjam', 'telat'])->count(),
+            'menungguPengembalian' => Peminjaman::where('status', 'menunggu_pengembalian')->count(),
+            'peminjamanTelat'      => Peminjaman::whereIn('status', ['dipinjam', 'telat'])
+                ->whereDate('tgl_kembali_plan', '<', today())->count(),
+        ]);
     }
 
-    public function indexPeminjaman()
+    // Halaman persetujuan: tab filter status, default "diajukan"
+    public function indexPeminjaman(Request $request)
     {
-        $peminjamans = Peminjaman::with(['user', 'detailPinjam.alat'])->latest()->get();
-        return view('petugas.peminjaman.index', compact('peminjamans'));
+        $status = $request->input('status', 'diajukan');
+        if (!in_array($status, self::STATUS_FILTER, true)) {
+            $status = 'diajukan';
+        }
+
+        $peminjamans = Peminjaman::with(['user', 'detailPinjam.alat'])
+            ->when($status !== 'semua', fn ($q) => $q->where('status', $status))
+            // Pengajuan: yang paling lama menunggu tampil paling atas
+            ->orderBy('id', $status === 'diajukan' ? 'asc' : 'desc')
+            ->paginate(10)
+            ->withQueryString();
+
+        $jumlahDiajukan = Peminjaman::where('status', 'diajukan')->count();
+
+        return view('petugas.peminjaman.index', compact('peminjamans', 'status', 'jumlahDiajukan'));
     }
 
     // Setujui pengajuan: cek status + stok, lalu kurangi stok (di service)
@@ -40,6 +57,33 @@ class PetugasController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Gagal menyetujui: ' . $e->getMessage());
         }
+    }
+
+    // Tolak pengajuan (stok tidak berubah)
+    public function tolakPeminjaman($id, PeminjamanService $service)
+    {
+        try {
+            $service->tolak((int) $id);
+            return redirect()->back()->with('success', 'Pengajuan peminjaman ditolak.');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Gagal menolak: ' . $e->getMessage());
+        }
+    }
+
+    // Daftar alat yang sedang dipinjam / diminta dikembalikan oleh peminjam
+    public function indexPengembalian(PeminjamanService $service)
+    {
+        $peminjamanAktif = Peminjaman::with(['user', 'detailPinjam.alat'])
+            ->whereIn('status', ['dipinjam', 'telat', 'menunggu_pengembalian'])
+            ->latest()
+            ->get();
+
+        // Hari telat dihitung dengan logika yang sama seperti saat denda disimpan
+        $hariTelat = $peminjamanAktif->mapWithKeys(
+            fn ($p) => [$p->id => $service->hitungHariTelat($p->tgl_kembali_plan)]
+        );
+
+        return view('petugas.pengembalian.index', compact('peminjamanAktif', 'hariTelat'));
     }
 
     // Proses pengembalian: denda telat dihitung otomatis, denda kerusakan dari input
@@ -64,15 +108,15 @@ class PetugasController extends Controller
         }
     }
 
-    // Daftar alat yang sedang dipinjam / diminta dikembalikan oleh peminjam
-    public function indexPengembalian()
+    // Tolak request pengembalian dari peminjam
+    public function tolakPengembalian($id, PeminjamanService $service)
     {
-        $peminjamanAktif = Peminjaman::with(['user', 'detailPinjam.alat'])
-            ->whereIn('status', ['dipinjam', 'telat', 'menunggu_pengembalian'])
-            ->latest()
-            ->get();
-
-        return view('petugas.pengembalian.index', compact('peminjamanAktif'));
+        try {
+            $peminjaman = $service->tolakPengembalian((int) $id);
+            return redirect()->back()->with('success', "Request pengembalian ditolak. Status dikembalikan ke {$peminjaman->status}.");
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Gagal menolak request: ' . $e->getMessage());
+        }
     }
 
     // ==========================================
@@ -118,7 +162,7 @@ class PetugasController extends Controller
         $data = $request->validate([
             'start_date' => 'required|date',
             'end_date'   => 'required|date|after_or_equal:start_date',
-            'status'     => 'nullable|in:' . implode(',', self::STATUS_LAPORAN),
+            'status'     => 'nullable|in:' . implode(',', self::STATUS_FILTER),
         ]);
 
         $data['status'] = $data['status'] ?? 'semua';

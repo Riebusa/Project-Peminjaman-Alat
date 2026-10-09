@@ -71,14 +71,16 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
 Route::middleware(['auth', 'role:petugas'])->prefix('petugas')->name('petugas.')->group(function () {
     // Dashboard
     Route::get('/dashboard', [PetugasController::class, 'index'])->name('dashboard');
-    
-    // TUGAS 1: Menyetujui Peminjaman
+
+    // TUGAS 1: Menyetujui / Menolak Peminjaman
     Route::get('/peminjaman', [PetugasController::class, 'indexPeminjaman'])->name('peminjaman.index');
     Route::post('/peminjaman/{id}/setujui', [PetugasController::class, 'setujuiPeminjaman'])->name('peminjaman.setujui');
-    
+    Route::post('/peminjaman/{id}/tolak', [PetugasController::class, 'tolakPeminjaman'])->name('peminjaman.tolak');
+
     // TUGAS 2: Kelola Pengembalian
     Route::get('/pengembalian', [PetugasController::class, 'indexPengembalian'])->name('pengembalian.index');
     Route::post('/pengembalian/{id}/proses', [PetugasController::class, 'prosesPengembalian'])->name('pengembalian.proses');
+    Route::post('/pengembalian/{id}/tolak', [PetugasController::class, 'tolakPengembalian'])->name('pengembalian.tolak');
 
     // TUGAS 3: Cetak Laporan
     Route::get('/laporan', [PetugasController::class, 'laporan'])->name('laporan.index');

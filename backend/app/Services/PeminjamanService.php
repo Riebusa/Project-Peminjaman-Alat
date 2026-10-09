@@ -60,6 +60,26 @@ class PeminjamanService
         });
     }
 
+    /**
+     * Tolak request pengembalian dari peminjam: status kembali ke dipinjam
+     * atau telat (sesuai tanggal). Stok tidak berubah.
+     */
+    public function tolakPengembalian(int $id): Peminjaman
+    {
+        return DB::transaction(function () use ($id) {
+            $peminjaman = Peminjaman::lockForUpdate()->findOrFail($id);
+
+            if ($peminjaman->status !== 'menunggu_pengembalian') {
+                throw new Exception("Peminjaman ini berstatus '{$peminjaman->status}', hanya request pengembalian yang bisa ditolak.");
+            }
+
+            $statusBaru = $this->hitungHariTelat($peminjaman->tgl_kembali_plan) > 0 ? 'telat' : 'dipinjam';
+            $peminjaman->update(['status' => $statusBaru]);
+
+            return $peminjaman;
+        });
+    }
+
     public function hitungHariTelat($tglKembaliPlan): int
     {
         $tglPlan = Carbon::parse($tglKembaliPlan)->startOfDay();
