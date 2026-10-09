@@ -4,16 +4,23 @@ namespace App\Http\Controllers;
 
 use App\Models\Peminjaman;
 use App\Services\PeminjamanService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class PetugasController extends Controller
 {
+    private const STATUS_LAPORAN = [
+        'semua', 'diajukan', 'dipinjam', 'telat',
+        'menunggu_pengembalian', 'dikembalikan', 'ditolak',
+    ];
+
     // Dashboard Petugas
     public function index()
     {
         // Petugas butuh melihat ada berapa pengajuan yang harus diurus
         $peminjamanDiajukan = Peminjaman::where('status', 'diajukan')->count();
-        $peminjamanAktif = Peminjaman::where('status', 'dipinjam')->count();
+        $peminjamanAktif = Peminjaman::whereIn('status', ['dipinjam', 'telat'])->count();
 
         return view('petugas.dashboard', compact('peminjamanDiajukan', 'peminjamanAktif'));
     }
@@ -68,9 +75,74 @@ class PetugasController extends Controller
         return view('petugas.pengembalian.index', compact('peminjamanAktif'));
     }
 
-    // Halaman filter/cetak laporan
-    public function laporan()
+    // ==========================================
+    // LAPORAN
+    // ==========================================
+
+    // Halaman filter + tabel rekap
+    public function laporan(Request $request)
     {
-        return view('petugas.laporan.index');
+        $peminjamans = null;
+        $ringkasan = null;
+
+        // Data baru ditampilkan setelah form filter dikirim
+        if ($request->filled('start_date')) {
+            $filter = $this->validasiFilterLaporan($request);
+            $peminjamans = $this->dataLaporan($filter);
+            $ringkasan = $this->ringkasanLaporan($peminjamans);
+        }
+
+        return view('petugas.laporan.index', compact('peminjamans', 'ringkasan'));
+    }
+
+    // Cetak laporan ke PDF (dibuka di tab baru)
+    public function cetakLaporan(Request $request)
+    {
+        $filter = $this->validasiFilterLaporan($request);
+        $peminjamans = $this->dataLaporan($filter);
+        $ringkasan = $this->ringkasanLaporan($peminjamans);
+
+        $pdf = Pdf::loadView('petugas.laporan.pdf', [
+            'filter'      => $filter,
+            'peminjamans' => $peminjamans,
+            'ringkasan'   => $ringkasan,
+            'petugas'     => auth()->user()->name,
+            'dicetak'     => now(),
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->stream("laporan-peminjaman-{$filter['start_date']}-sd-{$filter['end_date']}.pdf");
+    }
+
+    private function validasiFilterLaporan(Request $request): array
+    {
+        $data = $request->validate([
+            'start_date' => 'required|date',
+            'end_date'   => 'required|date|after_or_equal:start_date',
+            'status'     => 'nullable|in:' . implode(',', self::STATUS_LAPORAN),
+        ]);
+
+        $data['status'] = $data['status'] ?? 'semua';
+
+        return $data;
+    }
+
+    private function dataLaporan(array $filter): Collection
+    {
+        return Peminjaman::with(['user', 'detailPinjam.alat', 'pengembalian'])
+            ->whereDate('tgl_pinjam', '>=', $filter['start_date'])
+            ->whereDate('tgl_pinjam', '<=', $filter['end_date'])
+            ->when($filter['status'] !== 'semua', fn ($q) => $q->where('status', $filter['status']))
+            ->orderBy('tgl_pinjam')
+            ->orderBy('id')
+            ->get();
+    }
+
+    private function ringkasanLaporan(Collection $peminjamans): array
+    {
+        return [
+            'total'       => $peminjamans->count(),
+            'total_denda' => (int) $peminjamans->sum(fn ($p) => $p->pengembalian->denda ?? 0),
+            'per_status'  => $peminjamans->groupBy('status')->map->count(),
+        ];
     }
 }

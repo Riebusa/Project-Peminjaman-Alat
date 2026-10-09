@@ -20,7 +20,23 @@ class CheckRole
             return redirect()->route('login')->with('error', 'Sesi habis, silakan login kembali.');
         }
 
-        // 2. Cek apakah role sesuai dengan yang diizinkan
+        // 2. Akun dinonaktifkan saat sedang login: keluarkan paksa
+        if (!auth()->user()->is_active) {
+            auth()->logout();
+
+            if ($request->hasSession()) {
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            }
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Akun Anda dinonaktifkan.'], 403);
+            }
+
+            return redirect()->route('login')->with('error', 'Akun Anda telah dinonaktifkan. Silakan hubungi admin.');
+        }
+
+        // 3. Cek apakah role sesuai dengan yang diizinkan
         if (!in_array(auth()->user()->role, $roles)) {
             // Jika diakses via API
             if ($request->expectsJson()) {

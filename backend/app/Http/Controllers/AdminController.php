@@ -22,8 +22,8 @@ class AdminController extends Controller
         $totalUser = User::count();
         $totalPeminjaman = Peminjaman::count();
         $peminjamanTelat = Peminjaman::with('user')
-            ->where('status', 'dipinjam')
-            ->whereDate('tgl_kembali_plan', '<', now())
+            ->whereIn('status', ['dipinjam', 'telat'])
+            ->whereDate('tgl_kembali_plan', '<', today())
             ->get();
 
         // Mengambil alat yang stoknya sudah menipis (3 atau kurang)
@@ -263,7 +263,7 @@ class AdminController extends Controller
     public function destroyUser($id)
     {
         // Pencegahan: Admin tidak boleh menghapus akunnya sendiri
-        if ($id == auth()->id()) {
+        if ((int) $id === auth()->id()) {
             return redirect()->route('admin.user.index')->with('error', 'Aksi ditolak! Anda tidak dapat menghapus akun Anda sendiri yang sedang aktif.');
         }
 
@@ -276,6 +276,26 @@ class AdminController extends Controller
         $user->delete();
 
         return redirect()->route('admin.user.index')->with('success', 'User berhasil dihapus.');
+    }
+
+    // Mengaktifkan / menonaktifkan akun user
+    public function toggleAktifUser($id)
+    {
+        // Pencegahan: Admin tidak boleh menonaktifkan akunnya sendiri
+        if ((int) $id === auth()->id()) {
+            return redirect()->route('admin.user.index')
+                ->with('error', 'Aksi ditolak! Anda tidak dapat menonaktifkan akun Anda sendiri yang sedang aktif.');
+        }
+
+        $user = User::findOrFail($id);
+        $user->is_active = !$user->is_active;
+        $user->save();
+
+        $pesan = $user->is_active
+            ? "Akun {$user->name} berhasil diaktifkan kembali."
+            : "Akun {$user->name} berhasil dinonaktifkan. User tidak dapat login lagi.";
+
+        return redirect()->back()->with('success', $pesan);
     }
 
     // ==========================================
@@ -361,8 +381,8 @@ class AdminController extends Controller
 
     public function logAktivitas()
     {
-        // Mengambil log terbaru beserta data user-nya
-        $logs = LogAktivitas::with('user')->latest()->get();
+        // Mengambil log terbaru beserta data user-nya (dipaginasi agar ringan)
+        $logs = LogAktivitas::with('user')->latest()->paginate(20);
         return view('admin.log_aktivitas.index', compact('logs'));
     }
 }

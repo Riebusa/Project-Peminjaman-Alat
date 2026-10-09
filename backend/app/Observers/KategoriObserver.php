@@ -4,42 +4,34 @@ namespace App\Observers;
 
 use App\Models\Kategori;
 use App\Models\LogAktivitas;
-use Illuminate\Support\Facades\Auth;
 
 class KategoriObserver
 {
-    public function created(Kategori $kategori)
-{
-        if (auth()->check()) {
-            LogAktivitas::create([
-                'user_id' => auth()->id(),
-                'aktivitas' => "Menambahkan kategori baru: '{$kategori->nama_kategori}'"
-            ]);
-        }
+    public function created(Kategori $kategori): void
+    {
+        LogAktivitas::catat("Menambahkan kategori baru: '{$kategori->nama_kategori}'");
     }
 
-    // public function created(Kategori $kategori)
-    // {
-    //     LogAktivitas::create(['user_id' => Auth::id(), 'aktivitas' => "Menambahkan kategori baru: '{$kategori->nama_kategori}'"]);
-    // }
-
-    public function updated(Kategori $kategori)
+    public function updated(Kategori $kategori): void
     {
         $perubahan = $kategori->getChanges();
         unset($perubahan['updated_at']);
-        
+
+        if (empty($perubahan)) {
+            return;
+        }
+
         $detail = [];
         foreach ($perubahan as $kolom => $nilaiBaru) {
             $nilaiLama = $kategori->getOriginal($kolom) ?? 'kosong';
             $detail[] = "{$kolom} ({$nilaiLama} ➔ {$nilaiBaru})";
         }
-        
-        $teks = implode(', ', $detail);
-        LogAktivitas::create(['user_id' => Auth::id(), 'aktivitas' => "Memperbarui kategori ID #{$kategori->id}. Detail: {$teks}"]);
+
+        LogAktivitas::catat("Memperbarui kategori ID #{$kategori->id}. Detail: " . implode(', ', $detail));
     }
 
-    public function deleted(Kategori $kategori)
+    public function deleted(Kategori $kategori): void
     {
-        LogAktivitas::create(['user_id' => Auth::id(), 'aktivitas' => "Menghapus kategori: '{$kategori->nama_kategori}'"]);
+        LogAktivitas::catat("Menghapus kategori: '{$kategori->nama_kategori}'");
     }
 }

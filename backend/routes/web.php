@@ -25,6 +25,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::get('/users/{id}/edit', [AdminController::class, 'editUser'])->name('user.edit');
     Route::put('/users/{id}', [AdminController::class, 'updateUser'])->name('user.update');
     Route::delete('/users/{id}', [AdminController::class, 'destroyUser'])->name('user.destroy');
+    Route::patch('/users/{id}/toggle-aktif', [AdminController::class, 'toggleAktifUser'])->name('user.toggle');
 
     // CRUD Kategori
     Route::get('/kategori', [AdminController::class, 'indexKategori'])->name('kategori.index');
@@ -80,6 +81,7 @@ Route::middleware(['auth', 'role:petugas'])->prefix('petugas')->name('petugas.')
 
     // TUGAS 3: Cetak Laporan
     Route::get('/laporan', [PetugasController::class, 'laporan'])->name('laporan.index');
+    Route::get('/laporan/pdf', [PetugasController::class, 'cetakLaporan'])->name('laporan.pdf');
 });
 
 // 3. GRUP PEMINJAM

@@ -2,60 +2,75 @@
 
 namespace App\Observers;
 
-use App\Models\Peminjaman;
 use App\Models\LogAktivitas;
-use Illuminate\Support\Facades\Auth;
+use App\Models\Peminjaman;
 
 class PeminjamanObserver
 {
-    public function created(Peminjaman $peminjaman)
+    public function created(Peminjaman $peminjaman): void
     {
-        if (auth()->check()) {
-            LogAktivitas::create([
-                'user_id' => auth()->id(),
-                'aktivitas' => "Membuat peminjaman baru ({$peminjaman->id})"
-            ]);
-        }
+        LogAktivitas::catat("Membuat peminjaman baru #TRX-{$peminjaman->id}");
     }
-    // public function created(Peminjaman $peminjaman)
-    // {
-    //     LogAktivitas::create(['user_id' => Auth::id(), 'aktivitas' => "Membuat transaksi peminjaman baru (ID: #TRX-{$peminjaman->id})"]);
-    // }
 
-    public function updated(Peminjaman $peminjaman)
+    public function updated(Peminjaman $peminjaman): void
     {
         $perubahan = $peminjaman->getChanges();
         unset($perubahan['updated_at']);
-        
-        // Cek khusus jika ini adalah aktivitas pengembalian atau persetujuan (ubah status)
+
+        if (empty($perubahan)) {
+            return;
+        }
+
         if (isset($perubahan['status'])) {
-            $statusLama = $peminjaman->getOriginal('status');
-            $statusBaru = $perubahan['status'];
-            
-            if ($statusBaru === 'dikembalikan') {
-                LogAktivitas::create(['user_id' => Auth::id(), 'aktivitas' => "Menerima PENGEMBALIAN alat untuk transaksi #TRX-{$peminjaman->id}"]);
-                return; // Stop di sini agar tidak dobel log
-            }
-            
-            if ($statusBaru === 'dipinjam') {
-                LogAktivitas::create(['user_id' => Auth::id(), 'aktivitas' => "MENYETUJUI peminjaman alat untuk transaksi #TRX-{$peminjaman->id}"]);
+            $lama = $peminjaman->getOriginal('status');
+            $baru = $perubahan['status'];
+            $id   = "#TRX-{$peminjaman->id}";
+
+            $pesan = match (true) {
+                $lama === 'diajukan' && $baru === 'dipinjam'
+                    => "MENYETUJUI peminjaman alat untuk transaksi {$id}",
+                $lama === 'diajukan' && $baru === 'ditolak'
+                    => "MENOLAK pengajuan peminjaman untuk transaksi {$id}",
+                $baru === 'menunggu_pengembalian'
+                    => "Peminjam MENGAJUKAN pengembalian alat untuk transaksi {$id}",
+                $lama === 'menunggu_pengembalian' && in_array($baru, ['dipinjam', 'telat'], true)
+                    => "MENOLAK request pengembalian untuk transaksi {$id} (status kembali ke {$baru})",
+                $baru === 'dikembalikan'
+                    => $this->pesanPengembalian($peminjaman, $id),
+                default => null,
+            };
+
+            if ($pesan !== null) {
+                LogAktivitas::catat($pesan);
                 return;
             }
         }
-        
-        // Jika perubahan biasa selain status
+
+        // Perubahan lain (atau status di luar yang dikenali)
         $detail = [];
         foreach ($perubahan as $kolom => $nilaiBaru) {
             $nilaiLama = $peminjaman->getOriginal($kolom) ?? 'kosong';
             $detail[] = "{$kolom} ({$nilaiLama} ➔ {$nilaiBaru})";
         }
-        
-        $teks = implode(', ', $detail);
-        LogAktivitas::create(['user_id' => Auth::id(), 'aktivitas' => "Memperbarui transaksi #TRX-{$peminjaman->id}. Detail: {$teks}"]);
+
+        LogAktivitas::catat("Memperbarui transaksi #TRX-{$peminjaman->id}. Detail: " . implode(', ', $detail));
     }
 
-    public function deleted(Peminjaman $peminjaman)
+    public function deleted(Peminjaman $peminjaman): void
     {
-        LogAktivitas::create(['user_id' => Auth::id(), 'aktivitas' => "Menghapus data transaksi peminjaman (ID: #TRX-{$peminjaman->id})"]);
+        LogAktivitas::catat("Menghapus data transaksi peminjaman #TRX-{$peminjaman->id}");
+    }
+
+    private function pesanPengembalian(Peminjaman $peminjaman, string $id): string
+    {
+        $pesan = "Menerima PENGEMBALIAN alat untuk transaksi {$id}";
+
+        // Pengembalian dibuat service sebelum status diubah, jadi sudah ada di sini
+        $pengembalian = $peminjaman->pengembalian;
+        if ($pengembalian) {
+            $pesan .= ' (denda Rp ' . number_format($pengembalian->denda, 0, ',', '.') . ')';
+        }
+
+        return $pesan;
     }
 }

@@ -25,7 +25,7 @@
                         $teks = strtolower($log->aktivitas);
                         $badge = 'INFO';
                         $color = 'bg-slate-100 text-slate-700 border-slate-200';
-                        
+
                         // Deteksi Tipe Aksi
                         if (str_contains($teks, 'menambahkan') || str_contains($teks, 'mendaftarkan') || str_contains($teks, 'membuat')) {
                             $badge = 'CREATE';
@@ -36,9 +36,19 @@
                         } elseif (str_contains($teks, 'menghapus')) {
                             $badge = 'DELETE';
                             $color = 'bg-red-100 text-red-700 border-red-200';
-                        } elseif (str_contains($teks, 'menerima') || str_contains($teks, 'menyetujui')) {
+                        } elseif (
+                            str_contains($teks, 'menerima') ||
+                            str_contains($teks, 'menyetujui') ||
+                            str_contains($teks, 'menolak') ||
+                            str_contains($teks, 'mengajukan') ||
+                            str_contains($teks, 'mengaktifkan') ||
+                            str_contains($teks, 'menonaktifkan')
+                        ) {
                             $badge = 'ACTION';
                             $color = 'bg-purple-100 text-purple-700 border-purple-200';
+                        } elseif (str_contains($teks, '(login)') || str_contains($teks, '(logout)')) {
+                            $badge = 'AUTH';
+                            $color = 'bg-amber-100 text-amber-700 border-amber-200';
                         }
 
                         // Memisahkan Judul Aktivitas dan Detailnya
@@ -68,7 +78,7 @@
                                     {{ $judulAktivitas }}
                                 </span>
                             </div>
-                            
+
                             <!-- Menampilkan Detail (Jika ada) -->
                             @if($detailAktivitas)
                                 <div class="flex flex-wrap gap-2 mt-2">
@@ -82,13 +92,13 @@
                                         @endphp
 
                                         <div class="inline-flex items-center text-xs bg-white border border-slate-200 rounded-md px-2.5 py-1.5 shadow-sm">
-                                            <strong class="font-medium text-slate-500 mr-2 uppercase tracking-wide text-[10px]">{{ $kolom }}:</strong> 
-                                            
+                                            <strong class="font-medium text-slate-500 mr-2 uppercase tracking-wide text-[10px]">{{ $kolom }}:</strong>
+
                                             @if(count($nilaiParts) == 2)
                                                 <!-- Nilai Lama (Dicoret) -->
-                                                <span class="line-through text-slate-400">{{ $nilaiParts[0] }}</span> 
+                                                <span class="line-through text-slate-400">{{ $nilaiParts[0] }}</span>
                                                 <!-- Icon Panah -->
-                                                <svg class="w-3 h-3 text-slate-400 mx-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg> 
+                                                <svg class="w-3 h-3 text-slate-400 mx-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                                                 <!-- Nilai Baru -->
                                                 <span class="font-bold text-blue-600">{{ $nilaiParts[1] }}</span>
                                             @else
@@ -113,6 +123,9 @@
                 @endforelse
             </tbody>
         </table>
+    </div>
+    <div class="px-6 py-4 border-t border-slate-100">
+        {{ $logs->links() }}
     </div>
 </div>
 @endsection

@@ -15,7 +15,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name', 'email', 'password', 'role', 'no_hp', 'alamat', 'foto_profil'
     ];
-    
+
     protected $hidden = [
         'password', 'remember_token',
     ];
@@ -24,6 +24,7 @@ class User extends Authenticatable
     {
         return [
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
 

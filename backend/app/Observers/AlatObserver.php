@@ -4,60 +4,34 @@ namespace App\Observers;
 
 use App\Models\Alat;
 use App\Models\LogAktivitas;
-use Illuminate\Support\Facades\Auth;
 
 class AlatObserver
 {
-    // Fungsi bantuan untuk menyimpan log
-    private function catatLog($teksAktivitas)
+    public function created(Alat $alat): void
     {
-        if (Auth::check()) {
-            LogAktivitas::create([
-                'user_id'   => Auth::id(),
-                'aktivitas' => $teksAktivitas,
-            ]);
-        }
+        LogAktivitas::catat("Menambahkan alat baru: '{$alat->nama_alat}'");
     }
 
-    public function created(Alat $alat)
-    {
-        if (auth()->check()) {
-            LogAktivitas::create([
-                'user_id' => auth()->id(),
-                'aktivitas' => "Menambahkan alat baru: '{$alat->nama_alat}'"
-            ]);
-        }
-    }
-
-    // public function created(Alat $alat)
-    // {
-    //     $this->catatLog("Menambahkan data alat baru: '{$alat->nama_alat}'");
-    // }
-
-    public function updated(Alat $alat)
+    public function updated(Alat $alat): void
     {
         $perubahan = $alat->getChanges();
-        unset($perubahan['updated_at']); // Abaikan perubahan waktu agar log tidak penuh
-        
-        if (!empty($perubahan)) {
-            $detail = [];
-            foreach ($perubahan as $kolom => $nilaiBaru) {
-                // Mengambil nilai lama sebelum disimpan
-                $nilaiLama = $alat->getOriginal($kolom) ?? 'kosong';
-                
-                // Menyusun format nilai lama dan baru
-                $detail[] = "{$kolom} ({$nilaiLama} ➔ {$nilaiBaru})";
-            }
-            
-            $teks = implode(', ', $detail);
-            
-            // Format diubah menggunakan ". Detail: " agar file Blade mendeteksinya dan memunculkan kotak
-            $this->catatLog("Memperbarui data alat '{$alat->nama_alat}'. Detail: {$teks}");
+        unset($perubahan['updated_at']);
+
+        if (empty($perubahan)) {
+            return;
         }
+
+        $detail = [];
+        foreach ($perubahan as $kolom => $nilaiBaru) {
+            $nilaiLama = $alat->getOriginal($kolom) ?? 'kosong';
+            $detail[] = "{$kolom} ({$nilaiLama} ➔ {$nilaiBaru})";
+        }
+
+        LogAktivitas::catat("Memperbarui data alat '{$alat->nama_alat}'. Detail: " . implode(', ', $detail));
     }
 
-    public function deleted(Alat $alat)
+    public function deleted(Alat $alat): void
     {
-        $this->catatLog("Menghapus data alat: '{$alat->nama_alat}'");
+        LogAktivitas::catat("Menghapus data alat: '{$alat->nama_alat}'");
     }
 }
