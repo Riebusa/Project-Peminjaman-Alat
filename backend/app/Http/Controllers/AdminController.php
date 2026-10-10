@@ -7,6 +7,8 @@ use App\Models\Kategori;
 use App\Models\User;
 use App\Models\Peminjaman;
 use App\Models\LogAktivitas;
+use App\Models\DetailPinjam;
+use App\Models\Pengembalian;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -137,6 +139,12 @@ class AdminController extends Controller
     public function destroyAlat($id)
     {
         $alat = Alat::findOrFail($id);
+
+        // Pencegahan: riwayat peminjaman yang memuat alat ini ikut terhapus (cascade)
+        if (DetailPinjam::where('alat_id', $alat->id)->exists()) {
+            return redirect()->route('admin.alat.index')
+                ->with('error', "Alat '{$alat->nama_alat}' pernah dipinjam sehingga tidak bisa dihapus. Ubah kondisinya menjadi selain 'Baik' (misalnya 'Tidak Tersedia') agar tidak tampil di katalog.");
+        }
 
         // Hapus file gambar fisik jika ada menggunakan Storage Facade
         if ($alat->gambar) {
@@ -280,6 +288,12 @@ class AdminController extends Controller
         }
 
         $user = User::findOrFail($id);
+
+        // Pencegahan: transaksi dan data pengembalian ikut terhapus (cascade) bila user dihapus
+        if (Peminjaman::where('user_id', $user->id)->exists() || Pengembalian::where('petugas_id', $user->id)->exists()) {
+            return redirect()->route('admin.user.index')
+                ->with('error', "User '{$user->name}' memiliki riwayat peminjaman atau pengembalian sehingga tidak bisa dihapus. Gunakan tombol Nonaktifkan.");
+        }
 
         // Hapus file foto agar storage tidak penuh
         if ($user->foto_profil) {
