@@ -7,6 +7,7 @@ use App\Models\DetailPinjam;
 use App\Models\Peminjaman;
 use App\Models\User;
 use App\Services\PeminjamanService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -16,22 +17,52 @@ class KelolaPeminjamanController extends Controller
     // Admin boleh mencatat peminjaman yang terjadi paling lama sekian hari ke belakang
     private const MAKS_MUNDUR_HARI = 7;
     private const KONDISI_BISA_DIPINJAM = 'baik';
+    private const PER_HALAMAN = 10;
 
-    public function index()
+    public function index(Request $request)
     {
+        $search = trim((string) $request->input('search'));
+
+        // Tab yang sedang dibuka (supaya tidak kembali ke tab pertama saat pindah halaman)
+        $tabAwal = $request->input('tab', $request->has('selesai_page') ? 'selesai' : 'aktif');
+        if (!in_array($tabAwal, ['aktif', 'selesai'], true)) {
+            $tabAwal = 'aktif';
+        }
+
         // 1. Data Belum Selesai (Diajukan, Dipinjam, Telat, Menunggu Pengembalian)
-        $peminjamanAktif = Peminjaman::with(['user', 'detailPinjam.alat'])
-            ->whereIn('status', ['diajukan', 'dipinjam', 'telat', 'menunggu_pengembalian'])
-            ->latest()
-            ->get();
+        $queryAktif = Peminjaman::with(['user', 'detailPinjam.alat'])
+            ->whereIn('status', ['diajukan', 'dipinjam', 'telat', 'menunggu_pengembalian']);
+        $this->terapkanPencarian($queryAktif, $search);
+
+        $peminjamanAktif = $queryAktif->latest()
+            ->paginate(self::PER_HALAMAN, ['*'], 'aktif_page')
+            ->withQueryString()
+            ->appends('tab', 'aktif');
 
         // 2. Data Sudah Selesai (Dikembalikan, Ditolak)
-        $peminjamanSelesai = Peminjaman::with(['user', 'detailPinjam.alat'])
-            ->whereIn('status', ['dikembalikan', 'ditolak'])
-            ->latest()
-            ->get();
+        $querySelesai = Peminjaman::with(['user', 'detailPinjam.alat'])
+            ->whereIn('status', ['dikembalikan', 'ditolak']);
+        $this->terapkanPencarian($querySelesai, $search);
 
-        return view('admin.peminjaman.index', compact('peminjamanAktif', 'peminjamanSelesai'));
+        $peminjamanSelesai = $querySelesai->latest()
+            ->paginate(self::PER_HALAMAN, ['*'], 'selesai_page')
+            ->withQueryString()
+            ->appends('tab', 'selesai');
+
+        return view('admin.peminjaman.index', compact('peminjamanAktif', 'peminjamanSelesai', 'search', 'tabAwal'));
+    }
+
+    // Cari berdasarkan nama peminjam atau nama alat
+    private function terapkanPencarian($query, string $search): void
+    {
+        if ($search === '') {
+            return;
+        }
+
+        $query->where(function ($w) use ($search) {
+            $w->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$search}%"))
+              ->orWhereHas('detailPinjam.alat', fn ($a) => $a->where('nama_alat', 'like', "%{$search}%"));
+        });
     }
 
     // Konfirmasi Peminjaman (Diajukan -> Dipinjam). Stok dikurangi di service.
@@ -153,33 +184,15 @@ class KelolaPeminjamanController extends Controller
         }
     }
 
-    // Menghapus data peminjaman permanen
-    public function destroy($id)
+    // Menghapus data peminjaman permanen (stok disesuaikan di service)
+    public function destroy($id, PeminjamanService $service)
     {
-        $peminjaman = Peminjaman::with('detailPinjam')->findOrFail($id);
-
-        DB::beginTransaction();
         try {
-            // KEAMANAN STOK: Jika statusnya sudah dipinjam/telat/menunggu, kembalikan stok alatnya dulu!
-            if (in_array($peminjaman->status, ['dipinjam', 'telat', 'menunggu_pengembalian'])) {
-                foreach ($peminjaman->detailPinjam as $detail) {
-                    $alat = Alat::lockForUpdate()->find($detail->alat_id);
-                    if ($alat) {
-                        $alat->increment('stok', $detail->jumlah);
-                    }
-                }
-            }
-
-            // Hapus detail peminjaman
-            $peminjaman->detailPinjam()->delete();
-
-            // Hapus data utama
-            $peminjaman->delete();
-
-            DB::commit();
+            $service->hapus((int) $id);
             return back()->with('success', 'Data transaksi berhasil dihapus permanen dan stok alat telah disesuaikan.');
+        } catch (ModelNotFoundException $e) {
+            return back()->with('error', 'Transaksi tidak ditemukan (mungkin sudah dihapus).');
         } catch (\Exception $e) {
-            DB::rollback();
             return back()->with('error', 'Gagal menghapus data: ' . $e->getMessage());
         }
     }

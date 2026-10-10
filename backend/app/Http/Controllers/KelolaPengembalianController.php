@@ -2,33 +2,59 @@
 
 namespace App\Http\Controllers;
 
-use Carbon\Carbon;
 use App\Models\Peminjaman;
 use App\Models\Pengembalian;
 use App\Services\PeminjamanService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 
 class KelolaPengembalianController extends Controller
 {
-    public function index()
+    private const PER_HALAMAN = 10;
+
+    public function index(Request $request)
     {
+        $search = trim((string) $request->input('search'));
+
+        // Tab yang sedang dibuka (supaya tidak kembali ke tab pertama saat pindah halaman)
+        $tabAwal = $request->input('tab', $request->has('riwayat_page') ? 'riwayat' : 'request');
+        if (!in_array($tabAwal, ['request', 'riwayat'], true)) {
+            $tabAwal = 'request';
+        }
+
         // 1. Belum Diproses (Request dari Peminjam yang statusnya 'menunggu_pengembalian')
-        $belumDiproses = Peminjaman::with(['user', 'detailPinjam.alat'])
-            ->where('status', 'menunggu_pengembalian')
-            ->latest()
-            ->get();
+        $queryRequest = Peminjaman::with(['user', 'detailPinjam.alat'])
+            ->where('status', 'menunggu_pengembalian');
+
+        if ($search !== '') {
+            $queryRequest->where(function ($w) use ($search) {
+                $w->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$search}%"))
+                  ->orWhereHas('detailPinjam.alat', fn ($a) => $a->where('nama_alat', 'like', "%{$search}%"));
+            });
+        }
+
+        $belumDiproses = $queryRequest->latest()
+            ->paginate(self::PER_HALAMAN, ['*'], 'request_page')
+            ->withQueryString()
+            ->appends('tab', 'request');
 
         // 2. Sudah Diproses (Riwayat Pengembalian lengkap dengan relasi alat)
-        $sudahDiproses = Pengembalian::with(['peminjaman.user', 'peminjaman.detailPinjam.alat', 'petugas'])
-            ->latest()
-            ->get();
+        $queryRiwayat = Pengembalian::with(['peminjaman.user', 'peminjaman.detailPinjam.alat', 'petugas']);
 
-        // 3. Data Peminjaman Aktif (Untuk form manual)
-        $peminjamanAktif = Peminjaman::with(['user'])
-            ->whereIn('status', ['dipinjam', 'telat'])
-            ->get();
+        if ($search !== '') {
+            $queryRiwayat->where(function ($w) use ($search) {
+                $w->whereHas('peminjaman.user', fn ($u) => $u->where('name', 'like', "%{$search}%"))
+                  ->orWhereHas('peminjaman.detailPinjam.alat', fn ($a) => $a->where('nama_alat', 'like', "%{$search}%"))
+                  ->orWhere('kondisi_kembali', 'like', "%{$search}%");
+            });
+        }
 
-        return view('admin.pengembalian.index', compact('belumDiproses', 'sudahDiproses', 'peminjamanAktif'));
+        $sudahDiproses = $queryRiwayat->latest()
+            ->paginate(self::PER_HALAMAN, ['*'], 'riwayat_page')
+            ->withQueryString()
+            ->appends('tab', 'riwayat');
+
+        return view('admin.pengembalian.index', compact('belumDiproses', 'sudahDiproses', 'search', 'tabAwal'));
     }
 
     // Proses Terima Pengembalian (Dari Request Peminjam)
@@ -56,21 +82,17 @@ class KelolaPengembalianController extends Controller
         }
     }
 
-    // Tolak Request Pengembalian
-    public function tolakPengembalian($id)
+    // Tolak Request Pengembalian (logika di service, sama dengan petugas)
+    public function tolakPengembalian($id, PeminjamanService $service)
     {
-        $peminjaman = Peminjaman::findOrFail($id);
-
-        if ($peminjaman->status === 'menunggu_pengembalian') {
-            $tgl_plan = Carbon::parse($peminjaman->tgl_kembali_plan);
-            $status_baru = Carbon::today()->greaterThan($tgl_plan) ? 'telat' : 'dipinjam';
-
-            $peminjaman->update(['status' => $status_baru]);
-
-            return back()->with('success', 'Request pengembalian ditolak. Status dikembalikan ke ' . $status_baru);
+        try {
+            $peminjaman = $service->tolakPengembalian((int) $id);
+            return back()->with('success', "Request pengembalian ditolak. Status dikembalikan ke {$peminjaman->status}.");
+        } catch (ModelNotFoundException $e) {
+            return back()->with('error', 'Transaksi tidak ditemukan.');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Gagal menolak request: ' . $e->getMessage());
         }
-
-        return back()->with('error', 'Data tidak valid.');
     }
 
     // Menampilkan form tambah pengembalian manual

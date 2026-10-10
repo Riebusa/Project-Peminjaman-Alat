@@ -12,13 +12,14 @@ use Illuminate\Support\Facades\DB;
 /**
  * Satu-satunya tempat yang boleh mengubah stok alat akibat transaksi peminjaman.
  *  - Stok BERKURANG hanya saat disetujui (diajukan -> dipinjam).
- *  - Stok BERTAMBAH hanya saat dikembalikan (-> dikembalikan).
+ *  - Stok BERTAMBAH hanya saat dikembalikan (-> dikembalikan) atau saat transaksi
+ *    yang alatnya masih di tangan peminjam dihapus admin.
  *  - Menolak pengajuan TIDAK menyentuh stok.
  */
 class PeminjamanService
 {
     public const DENDA_PER_HARI = 1000;
-    public const MAKS_DENDA_KERUSAKAN = 10000000;
+    public const MAKS_DENDA_KERUSAKAN = 10000000; // Rp 10 juta
     public const STATUS_BISA_DIKEMBALIKAN = ['dipinjam', 'telat', 'menunggu_pengembalian'];
 
     public function setujui(int $id): Peminjaman
@@ -78,6 +79,30 @@ class PeminjamanService
             $peminjaman->update(['status' => $statusBaru]);
 
             return $peminjaman;
+        });
+    }
+
+    /**
+     * Hapus transaksi permanen. Kalau alatnya masih di tangan peminjam
+     * (dipinjam / telat / menunggu pengembalian), stoknya dikembalikan dulu.
+     * Status dibaca ulang setelah baris dikunci, jadi aman dari proses bersamaan.
+     */
+    public function hapus(int $id): void
+    {
+        DB::transaction(function () use ($id) {
+            $peminjaman = Peminjaman::with('detailPinjam')->lockForUpdate()->findOrFail($id);
+
+            if (in_array($peminjaman->status, self::STATUS_BISA_DIKEMBALIKAN, true)) {
+                foreach ($peminjaman->detailPinjam as $detail) {
+                    $alat = Alat::lockForUpdate()->find($detail->alat_id);
+                    if ($alat) {
+                        $alat->increment('stok', $detail->jumlah);
+                    }
+                }
+            }
+
+            $peminjaman->detailPinjam()->delete();
+            $peminjaman->delete();
         });
     }
 
