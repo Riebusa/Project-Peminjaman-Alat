@@ -12,7 +12,7 @@ class KelolaPengembalianController extends Controller
 {
     private const PER_HALAMAN = 10;
 
-    public function index(Request $request)
+    public function index(Request $request, PeminjamanService $service)
     {
         $search = trim((string) $request->input('search'));
 
@@ -38,6 +38,11 @@ class KelolaPengembalianController extends Controller
             ->withQueryString()
             ->appends('tab', 'request');
 
+        // Hari telat dihitung dengan logika yang sama seperti saat denda disimpan
+        $hariTelat = $belumDiproses->getCollection()->mapWithKeys(
+            fn ($p) => [$p->id => $service->hitungHariTelat($p->tgl_kembali_plan)]
+        );
+
         // 2. Sudah Diproses (Riwayat Pengembalian lengkap dengan relasi alat)
         $queryRiwayat = Pengembalian::with(['peminjaman.user', 'peminjaman.detailPinjam.alat', 'petugas']);
 
@@ -54,7 +59,7 @@ class KelolaPengembalianController extends Controller
             ->withQueryString()
             ->appends('tab', 'riwayat');
 
-        return view('admin.pengembalian.index', compact('belumDiproses', 'sudahDiproses', 'search', 'tabAwal'));
+        return view('admin.pengembalian.index', compact('belumDiproses', 'sudahDiproses', 'hariTelat', 'search', 'tabAwal'));
     }
 
     // Proses Terima Pengembalian (Dari Request Peminjam)

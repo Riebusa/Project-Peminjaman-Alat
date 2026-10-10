@@ -12,26 +12,50 @@ use App\Models\Pengembalian;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use App\Services\PeminjamanService;
 
 class AdminController extends Controller
 {
-    public function index()
+    public function index(PeminjamanService $service)
     {
-        // Mengambil data statistik untuk dashboard
-        $totalAlat = Alat::count();
-        $totalStok = Alat::sum('stok');
-        $totalKategori = Kategori::count();
-        $totalUser = User::count();
-        $totalPeminjaman = Peminjaman::count();
-        $peminjamanTelat = Peminjaman::with('user')
-            ->whereIn('status', ['dipinjam', 'telat'])
-            ->whereDate('tgl_kembali_plan', '<', today())
+        // Peminjaman yang sudah lewat tenggat dan belum dikembalikan
+        $queryTelat = Peminjaman::whereIn('status', ['dipinjam', 'telat'])
+            ->whereDate('tgl_kembali_plan', '<', today());
+
+        $jumlahTelat = (clone $queryTelat)->count();
+
+        // Tampilkan 10 yang paling lama terlambat
+        $peminjamanTelat = (clone $queryTelat)->with('user')
+            ->orderBy('tgl_kembali_plan')
+            ->limit(10)
             ->get();
 
-        // Mengambil alat yang stoknya sudah menipis (3 atau kurang)
-        $stokMenipis = Alat::where('stok', '<=', 3)->get();
+        // Hari telat dihitung dengan logika yang sama seperti saat denda disimpan
+        $hariTelat = $peminjamanTelat->mapWithKeys(
+            fn ($p) => [$p->id => $service->hitungHariTelat($p->tgl_kembali_plan)]
+        );
 
-        return view('admin.dashboard', compact('totalAlat', 'totalStok', 'totalKategori', 'totalUser', 'totalPeminjaman', 'peminjamanTelat', 'stokMenipis'));
+        // Alat yang stoknya menipis (3 atau kurang), yang paling sedikit di atas
+        $stokMenipis = Alat::where('stok', '<=', 3)
+            ->orderBy('stok')
+            ->orderBy('nama_alat')
+            ->limit(8)
+            ->get();
+
+        return view('admin.dashboard', [
+            'totalAlat'           => Alat::count(),
+            'totalStok'           => Alat::sum('stok'),
+            'totalKategori'       => Kategori::count(),
+            'totalUser'           => User::count(),
+            'totalPeminjaman'     => Peminjaman::count(),
+            'pengajuanMenunggu'   => Peminjaman::where('status', 'diajukan')->count(),
+            'requestPengembalian' => Peminjaman::where('status', 'menunggu_pengembalian')->count(),
+            'jumlahTelat'         => $jumlahTelat,
+            'peminjamanTelat'     => $peminjamanTelat,
+            'hariTelat'           => $hariTelat,
+            'stokMenipis'         => $stokMenipis,
+            'jumlahStokMenipis'   => Alat::where('stok', '<=', 3)->count(),
+        ]);
     }
 
     // ==========================================

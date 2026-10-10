@@ -19,7 +19,7 @@ class KelolaPeminjamanController extends Controller
     private const KONDISI_BISA_DIPINJAM = 'baik';
     private const PER_HALAMAN = 10;
 
-    public function index(Request $request)
+    public function index(Request $request, PeminjamanService $service)
     {
         $search = trim((string) $request->input('search'));
 
@@ -39,8 +39,13 @@ class KelolaPeminjamanController extends Controller
             ->withQueryString()
             ->appends('tab', 'aktif');
 
-        // 2. Data Sudah Selesai (Dikembalikan, Ditolak)
-        $querySelesai = Peminjaman::with(['user', 'detailPinjam.alat'])
+        // Hari telat dihitung dengan logika yang sama seperti saat denda disimpan
+        $hariTelat = $peminjamanAktif->getCollection()->mapWithKeys(
+            fn ($p) => [$p->id => $service->hitungHariTelat($p->tgl_kembali_plan)]
+        );
+
+        // 2. Data Sudah Selesai (Dikembalikan, Ditolak) beserta data pengembaliannya
+        $querySelesai = Peminjaman::with(['user', 'detailPinjam.alat', 'pengembalian'])
             ->whereIn('status', ['dikembalikan', 'ditolak']);
         $this->terapkanPencarian($querySelesai, $search);
 
@@ -49,7 +54,7 @@ class KelolaPeminjamanController extends Controller
             ->withQueryString()
             ->appends('tab', 'selesai');
 
-        return view('admin.peminjaman.index', compact('peminjamanAktif', 'peminjamanSelesai', 'search', 'tabAwal'));
+        return view('admin.peminjaman.index', compact('peminjamanAktif', 'peminjamanSelesai', 'hariTelat', 'search', 'tabAwal'));
     }
 
     // Cari berdasarkan nama peminjam atau nama alat

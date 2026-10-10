@@ -1,10 +1,10 @@
-@extends('layouts.dev') <!-- Sesuaikan dengan nama layout Anda -->
+@extends('layouts.dev')
 
 @section('content')
 <!-- Header Dashboard Minimalis -->
 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 border-b border-slate-200 pb-5">
     <div>
-        <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Dashboard Overview</h2>
+        <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Ringkasan Dashboard</h2>
         <p class="text-slate-500 text-sm mt-1">
             Selamat datang kembali, <span class="font-semibold text-slate-700">{{ Auth::user()->name ?? 'Admin' }}</span>.
         </p>
@@ -15,6 +15,25 @@
             {{ \Carbon\Carbon::now()->translatedFormat('l, d F Y') }}
         </p>
     </div>
+</div>
+
+<!-- Perlu Tindakan -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <a href="{{ route('admin.peminjaman.index') }}"
+       class="bg-white p-5 rounded-lg border {{ $pengajuanMenunggu > 0 ? 'border-amber-300' : 'border-slate-200' }} shadow-sm hover:shadow-md transition-shadow">
+        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Pengajuan Menunggu Persetujuan</h3>
+        <p class="text-3xl font-extrabold mt-2 {{ $pengajuanMenunggu > 0 ? 'text-amber-600' : 'text-slate-800' }}">{{ $pengajuanMenunggu }}</p>
+    </a>
+    <a href="{{ route('admin.pengembalian.index') }}"
+       class="bg-white p-5 rounded-lg border {{ $requestPengembalian > 0 ? 'border-purple-300' : 'border-slate-200' }} shadow-sm hover:shadow-md transition-shadow">
+        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Request Pengembalian</h3>
+        <p class="text-3xl font-extrabold mt-2 {{ $requestPengembalian > 0 ? 'text-purple-600' : 'text-slate-800' }}">{{ $requestPengembalian }}</p>
+    </a>
+    <a href="{{ route('admin.peminjaman.index') }}"
+       class="bg-white p-5 rounded-lg border {{ $jumlahTelat > 0 ? 'border-red-300' : 'border-slate-200' }} shadow-sm hover:shadow-md transition-shadow">
+        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Peminjaman Terlambat</h3>
+        <p class="text-3xl font-extrabold mt-2 {{ $jumlahTelat > 0 ? 'text-red-600' : 'text-slate-800' }}">{{ $jumlahTelat }}</p>
+    </a>
 </div>
 
 <!-- Kartu Statistik (Gaya Enterprise: Clean, Border Halus, Icon Kecil di Pojok) -->
@@ -66,66 +85,123 @@
     </div>
 </div>
 
-<!-- Widget Data Tabel (Terlihat lebih sistematis) -->
-<div class="bg-white border border-slate-200 rounded-lg shadow-sm">
-    <div class="px-6 py-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50 rounded-t-lg">
-        <div class="flex items-center gap-3">
-            <div class="w-2 h-2 rounded-full {{ $peminjamanTelat->count() > 0 ? 'bg-red-500 animate-pulse' : 'bg-slate-300' }}"></div>
-            <h3 class="font-bold text-slate-800">Need Action: Peminjaman Terlambat</h3>
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+    <!-- Widget: Peminjaman Terlambat -->
+    <div class="xl:col-span-2 bg-white border border-slate-200 rounded-lg shadow-sm">
+        <div class="px-6 py-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50 rounded-t-lg">
+            <div class="flex items-center gap-3">
+                <div class="w-2 h-2 rounded-full {{ $jumlahTelat > 0 ? 'bg-red-500 animate-pulse' : 'bg-slate-300' }}"></div>
+                <h3 class="font-bold text-slate-800">Perlu Tindakan: Peminjaman Terlambat</h3>
+            </div>
+            @if($jumlahTelat > 0)
+                <span class="bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded-md">
+                    {{ $jumlahTelat }} Terlambat
+                </span>
+            @endif
         </div>
-        @if($peminjamanTelat->count() > 0)
-            <span class="bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded-md">
-                {{ $peminjamanTelat->count() }} Terlambat
-            </span>
-        @endif
+        
+        <div class="overflow-x-auto">
+            @if($jumlahTelat > 0)
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-white border-b border-slate-100 text-xs text-slate-500 uppercase tracking-wider">
+                            <th class="px-6 py-4 font-medium">ID Transaksi</th>
+                            <th class="px-6 py-4 font-medium">Peminjam</th>
+                            <th class="px-6 py-4 font-medium">Tenggat Waktu</th>
+                            <th class="px-6 py-4 font-medium">Keterlambatan</th>
+                            <th class="px-6 py-4 text-right font-medium">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach($peminjamanTelat as $pinjam)
+                        @php
+                            $hari = $hariTelat[$pinjam->id] ?? 0;
+                            $dendaTelat = $hari * \App\Services\PeminjamanService::DENDA_PER_HARI;
+                        @endphp
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4">
+                                <span class="font-mono text-sm text-slate-700">#TRX-{{ str_pad($pinjam->id, 4, '0', STR_PAD_LEFT) }}</span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <p class="text-sm font-semibold text-slate-800">{{ $pinjam->user->name ?? 'User Dihapus' }}</p>
+                            </td>
+                            <td class="px-6 py-4">
+                                <p class="text-sm text-slate-600">{{ \Carbon\Carbon::parse($pinjam->tgl_kembali_plan)->translatedFormat('d M Y') }}</p>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="inline-flex items-center gap-1.5 bg-red-50 px-2.5 py-1 rounded-md border border-red-100">
+                                    <svg class="w-3.5 h-3.5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    <span class="text-xs font-bold text-red-700">Telat {{ $hari }} Hari</span>
+                                </div>
+                                <p class="text-[11px] text-red-500 mt-1">Denda telat: Rp {{ number_format($dendaTelat, 0, ',', '.') }}</p>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <a href="{{ route('admin.peminjaman.index', ['search' => $pinjam->user->name ?? '']) }}" class="inline-block px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 hover:text-slate-900 transition-all shadow-sm">
+                                    Detail
+                                </a>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+
+                @if($jumlahTelat > $peminjamanTelat->count())
+                    <div class="px-6 py-3 border-t border-slate-100 text-xs text-slate-500">
+                        Menampilkan {{ $peminjamanTelat->count() }} dari {{ $jumlahTelat }} peminjaman yang paling lama terlambat.
+                        <a href="{{ route('admin.peminjaman.index') }}" class="font-semibold text-slate-700 underline">Lihat semua</a>
+                    </div>
+                @endif
+            @else
+                <div class="px-6 py-12 flex flex-col items-center justify-center">
+                    <div class="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mb-3">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    </div>
+                    <p class="text-base font-semibold text-slate-700">Semua Terkendali</p>
+                    <p class="text-sm text-slate-500 mt-1">Tidak ada peminjaman yang melewati batas tenggat waktu.</p>
+                </div>
+            @endif
+        </div>
     </div>
-    
-    <div class="overflow-x-auto">
-        @if($peminjamanTelat->count() > 0)
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="bg-white border-b border-slate-100 text-xs text-slate-500 uppercase tracking-wider">
-                        <th class="px-6 py-4 font-medium">ID Transaksi</th>
-                        <th class="px-6 py-4 font-medium">Peminjam</th>
-                        <th class="px-6 py-4 font-medium">Tenggat Waktu</th>
-                        <th class="px-6 py-4 font-medium">Status Telat</th>
-                        <th class="px-6 py-4 text-right font-medium">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    @foreach($peminjamanTelat as $pinjam)
-                    <tr class="hover:bg-slate-50 transition-colors">
-                        <td class="px-6 py-4">
-                            <span class="font-mono text-sm text-slate-700">#TRX-{{ str_pad($pinjam->id, 4, '0', STR_PAD_LEFT) }}</span>
-                        </td>
-                        <td class="px-6 py-4">
-                            <p class="text-sm font-semibold text-slate-800">{{ $pinjam->user->name ?? 'User Unknown' }}</p>
-                        </td>
-                        <td class="px-6 py-4">
-                            <p class="text-sm text-slate-600">{{ \Carbon\Carbon::parse($pinjam->tgl_kembali_plan)->translatedFormat('d M Y') }}</p>
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="inline-flex items-center gap-1.5 bg-red-50 px-2.5 py-1 rounded-md border border-red-100">
-                                <svg class="w-3.5 h-3.5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                <span class="text-xs font-bold text-red-700">Telat {{ (int) \Carbon\Carbon::parse($pinjam->tgl_kembali_plan)->diffInDays(now()) }} Hari</span>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 text-right">
-                            <a href="{{ route('admin.peminjaman.index') }}" class="inline-block px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 hover:text-slate-900 transition-all shadow-sm">
-                                Detail
-                            </a>
-                        </td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
+
+    <!-- Widget: Stok Menipis -->
+    <div class="bg-white border border-slate-200 rounded-lg shadow-sm">
+        <div class="px-6 py-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50 rounded-t-lg">
+            <div class="flex items-center gap-3">
+                <div class="w-2 h-2 rounded-full {{ $jumlahStokMenipis > 0 ? 'bg-amber-500' : 'bg-slate-300' }}"></div>
+                <h3 class="font-bold text-slate-800">Stok Menipis</h3>
+            </div>
+            @if($jumlahStokMenipis > 0)
+                <span class="bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-md">{{ $jumlahStokMenipis }} Alat</span>
+            @endif
+        </div>
+
+        @if($jumlahStokMenipis > 0)
+            <ul class="divide-y divide-slate-100">
+                @foreach($stokMenipis as $alat)
+                    <li class="px-6 py-3 flex items-center justify-between gap-3">
+                        <span class="text-sm font-medium text-slate-800">{{ $alat->nama_alat }}</span>
+                        @if($alat->stok < 1)
+                            <span class="text-xs font-bold px-2 py-0.5 rounded bg-red-100 text-red-700">Habis</span>
+                        @else
+                            <span class="text-xs font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800">Sisa {{ $alat->stok }}</span>
+                        @endif
+                    </li>
+                @endforeach
+            </ul>
+            <div class="px-6 py-3 border-t border-slate-100 text-xs text-slate-500">
+                @if($jumlahStokMenipis > $stokMenipis->count())
+                    Menampilkan {{ $stokMenipis->count() }} dari {{ $jumlahStokMenipis }} alat.
+                @endif
+                <a href="{{ route('admin.alat.index') }}" class="font-semibold text-slate-700 underline">Kelola Alat</a>
+            </div>
         @else
             <div class="px-6 py-12 flex flex-col items-center justify-center">
                 <div class="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mb-3">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                 </div>
-                <p class="text-base font-semibold text-slate-700">Semua Terkendali</p>
-                <p class="text-sm text-slate-500 mt-1">Tidak ada peminjaman yang melewati batas tenggat waktu.</p>
+                <p class="text-base font-semibold text-slate-700">Stok Aman</p>
+                <p class="text-sm text-slate-500 mt-1">Tidak ada alat dengan stok 3 atau kurang.</p>
             </div>
         @endif
     </div>

@@ -67,7 +67,11 @@
                     </thead>
                     <tbody class="text-sm divide-y divide-gray-100">
                         @forelse($belumDiproses as $peminjaman)
-                        <tr class="hover:bg-gray-50">
+                        @php
+                            $hari = $hariTelat[$peminjaman->id] ?? 0;
+                            $dendaTelat = $hari * \App\Services\PeminjamanService::DENDA_PER_HARI;
+                        @endphp
+                        <tr class="hover:bg-gray-50 {{ $hari > 0 ? 'bg-red-50/30' : '' }}">
                             <td class="py-3 px-4 font-bold text-gray-900">{{ $peminjaman->user->name ?? 'User Dihapus' }}</td>
                             <td class="py-3 px-4">
                                 <ul class="list-disc pl-4">
@@ -78,6 +82,12 @@
                             </td>
                             <td class="py-3 px-4 text-gray-600">
                                 {{ \Carbon\Carbon::parse($peminjaman->tgl_kembali_plan)->format('d M Y') }}
+                                @if($hari > 0)
+                                    <p class="text-xs text-red-600 font-semibold mt-1">Telat {{ $hari }} hari</p>
+                                    <p class="text-[11px] text-red-500">Denda telat: Rp {{ number_format($dendaTelat, 0, ',', '.') }}</p>
+                                @else
+                                    <p class="text-xs text-emerald-600 mt-1">Tepat waktu</p>
+                                @endif
                             </td>
                             <td class="py-3 px-4 bg-purple-50/30">
                                 <form action="{{ route('admin.pengembalian.terima', $peminjaman->id) }}" method="POST" class="w-64">
@@ -91,7 +101,9 @@
                                     </div>
                                     <div class="flex gap-1">
                                         <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-1.5 rounded">Terima</button>
-                                        <button type="button" onclick="document.getElementById('form-tolak-{{ $peminjaman->id }}').submit();" class="w-1/3 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold py-1.5 rounded border border-red-200">Tolak</button>
+                                        <button type="button"
+                                                onclick="if (confirm('Tolak request pengembalian ini? Status akan dikembalikan seperti semula.')) document.getElementById('form-tolak-{{ $peminjaman->id }}').submit();"
+                                                class="w-1/3 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold py-1.5 rounded border border-red-200">Tolak</button>
                                     </div>
                                 </form>
                                 <!-- Form tersembunyi untuk tolak request -->

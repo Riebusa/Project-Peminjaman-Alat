@@ -103,7 +103,7 @@
             </nav>
             
             <div class="p-4 border-t border-gray-800 text-sm text-gray-400">
-                Logged in as: <span class="text-white font-semibold">{{ auth()->user()->name }}</span>
+                Masuk sebagai: <span class="text-white font-semibold">{{ auth()->user()->name }}</span>
             </div>
         </aside>
 

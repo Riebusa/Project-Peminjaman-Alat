@@ -62,14 +62,32 @@
                     </thead>
                     <tbody class="text-sm divide-y divide-gray-100">
                         @forelse($peminjamanAktif as $peminjaman)
-                        <tr class="hover:bg-gray-50">
+                        @php
+                            $isDiajukan = $peminjaman->status === 'diajukan';
+                            $berjalan = in_array($peminjaman->status, ['dipinjam', 'telat', 'menunggu_pengembalian'], true);
+                            $hari = $berjalan ? ($hariTelat[$peminjaman->id] ?? 0) : 0;
+                            $dendaTelat = $hari * \App\Services\PeminjamanService::DENDA_PER_HARI;
+                            // Ada alat yang stoknya tidak cukup untuk jumlah yang diminta?
+                            $stokKurang = $isDiajukan && $peminjaman->detailPinjam->contains(
+                                fn ($d) => !$d->alat || $d->alat->stok < $d->jumlah
+                            );
+                        @endphp
+                        <tr class="hover:bg-gray-50 {{ $hari > 0 ? 'bg-red-50/30' : '' }}">
                             <td class="py-3 px-4">
                                 <span class="font-bold text-gray-900">{{ $peminjaman->user->name ?? 'User Dihapus' }}</span>
                             </td>
                             <td class="py-3 px-4">
                                 <ul class="list-disc pl-4">
                                     @foreach($peminjaman->detailPinjam as $detail)
-                                        <li>{{ $detail->alat->nama_alat ?? 'Dihapus' }} ({{ $detail->jumlah }})</li>
+                                        @php $kurang = $isDiajukan && (!$detail->alat || $detail->alat->stok < $detail->jumlah); @endphp
+                                        <li>
+                                            {{ $detail->alat->nama_alat ?? 'Dihapus' }} ({{ $detail->jumlah }})
+                                            @if($isDiajukan && $detail->alat)
+                                                <span class="text-xs {{ $kurang ? 'text-red-600 font-bold' : 'text-gray-400' }}">
+                                                    stok: {{ $detail->alat->stok }}{{ $kurang ? ' (tidak cukup)' : '' }}
+                                                </span>
+                                            @endif
+                                        </li>
                                     @endforeach
                                 </ul>
                             </td>
@@ -77,17 +95,23 @@
                                 {{ \Carbon\Carbon::parse($peminjaman->tgl_pinjam)->format('d M') }} s/d {{ \Carbon\Carbon::parse($peminjaman->tgl_kembali_plan)->format('d M Y') }}
                             </td>
                             <td class="py-3 px-4">
-                                <span class="px-2.5 py-1 text-xs font-bold rounded-md uppercase 
-                                    {{ $peminjaman->status == 'diajukan' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800' }}">
-                                    {{ str_replace('_', ' ', $peminjaman->status) }}
-                                </span>
+                                <x-status-badge :status="$peminjaman->status" />
+                                @if($hari > 0)
+                                    <p class="text-xs text-red-600 font-semibold mt-1.5">Telat {{ $hari }} hari</p>
+                                    <p class="text-[11px] text-red-500">Denda telat: Rp {{ number_format($dendaTelat, 0, ',', '.') }}</p>
+                                @endif
                             </td>
                             <td class="py-3 px-4 text-right">
-                                @if($peminjaman->status == 'diajukan')
+                                @if($isDiajukan)
                                     <div class="flex flex-col gap-1 items-end">
-                                        <form action="{{ route('admin.peminjaman.setujui', $peminjaman->id) }}" method="POST">
+                                        <form action="{{ route('admin.peminjaman.setujui', $peminjaman->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menyetujui? Stok alat akan otomatis berkurang.')">
                                             @csrf
-                                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded font-bold w-full">Setujui</button>
+                                            <button type="submit"
+                                                    @disabled($stokKurang)
+                                                    title="{{ $stokKurang ? 'Stok tidak mencukupi' : '' }}"
+                                                    class="text-white text-xs px-3 py-1.5 rounded font-bold w-full {{ $stokKurang ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700' }}">
+                                                Setujui
+                                            </button>
                                         </form>
                                         <form action="{{ route('admin.peminjaman.tolak', $peminjaman->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menolak?')">
                                             @csrf
@@ -131,7 +155,7 @@
                             <th class="py-3 px-4 font-semibold">Peminjam</th>
                             <th class="py-3 px-4 font-semibold">Alat (Jumlah)</th>
                             <th class="py-3 px-4 font-semibold">Status Akhir</th>
-                            <!-- Tambahkan Kolom Aksi -->
+                            <th class="py-3 px-4 font-semibold">Pengembalian</th>
                             <th class="py-3 px-4 font-semibold text-right">Aksi</th>
                         </tr>
                     </thead>
@@ -147,12 +171,19 @@
                                 </ul>
                             </td>
                             <td class="py-3 px-4">
-                                <span class="px-2.5 py-1 text-xs font-bold rounded-md uppercase 
-                                    {{ $peminjaman->status == 'dikembalikan' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800' }}">
-                                    {{ $peminjaman->status }}
-                                </span>
+                                <x-status-badge :status="$peminjaman->status" />
                             </td>
-                            <!-- Tambahkan Tombol Hapus -->
+                            <td class="py-3 px-4">
+                                @if($peminjaman->pengembalian)
+                                    <span class="text-xs text-gray-600 block">{{ \Carbon\Carbon::parse($peminjaman->pengembalian->tgl_kembali)->format('d M Y') }}</span>
+                                    <span class="text-xs font-bold {{ $peminjaman->pengembalian->denda > 0 ? 'text-red-600' : 'text-emerald-600' }}">
+                                        Denda Rp {{ number_format($peminjaman->pengembalian->denda, 0, ',', '.') }}
+                                    </span>
+                                @else
+                                    <span class="text-gray-400">-</span>
+                                @endif
+                            </td>
+                            <!-- Tombol Hapus -->
                             <td class="py-3 px-4 text-right">
                                 <form action="{{ route('admin.peminjaman.destroy', $peminjaman->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus riwayat ini secara permanen?')">
                                     @csrf
@@ -165,7 +196,7 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="4" class="py-8 text-center text-gray-500">{{ $search !== '' ? 'Tidak ada riwayat yang cocok dengan pencarian.' : 'Belum ada riwayat selesai.' }}</td></tr>
+                        <tr><td colspan="5" class="py-8 text-center text-gray-500">{{ $search !== '' ? 'Tidak ada riwayat yang cocok dengan pencarian.' : 'Belum ada riwayat selesai.' }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>

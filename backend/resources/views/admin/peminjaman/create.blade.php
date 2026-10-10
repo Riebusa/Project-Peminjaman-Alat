@@ -108,7 +108,7 @@
     </form>
 </div>
 
-<!-- Script Tom Select & Logika Dinamis Dinamis -->
+<!-- Script Tom Select & Logika Baris Dinamis -->
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
