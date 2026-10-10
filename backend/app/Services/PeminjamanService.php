@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 class PeminjamanService
 {
     public const DENDA_PER_HARI = 1000;
+    public const MAKS_DENDA_KERUSAKAN = 10000000;
     public const STATUS_BISA_DIKEMBALIKAN = ['dipinjam', 'telat', 'menunggu_pengembalian'];
 
     public function setujui(int $id): Peminjaman

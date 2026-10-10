@@ -91,7 +91,10 @@ class PetugasController extends Controller
     {
         $request->validate([
             'kondisi_kembali' => 'required|string|max:255',
-            'denda_kerusakan' => 'nullable|integer|min:0',
+            'denda_kerusakan' => ['nullable', 'integer', 'min:0', 'max:' . PeminjamanService::MAKS_DENDA_KERUSAKAN],
+        ], [
+            'denda_kerusakan.integer' => 'Denda kerusakan harus berupa angka bulat.',
+            'denda_kerusakan.max'     => 'Denda kerusakan maksimal Rp ' . number_format(PeminjamanService::MAKS_DENDA_KERUSAKAN, 0, ',', '.') . '.',
         ]);
 
         try {

@@ -37,6 +37,13 @@
             {{ session('error') }}
         </div>
     @endif
+    @if($errors->any())
+        <div class="mb-4 bg-red-50 border border-red-200 text-red-800 p-3 rounded-lg text-sm">
+            @foreach($errors->all() as $error)
+                <p>{{ $error }}</p>
+            @endforeach
+        </div>
+    @endif
 
     <form action="{{ route('admin.peminjaman.store') }}" method="POST">
         @csrf
@@ -59,6 +66,7 @@
             <div>
                 <label class="block text-gray-700 text-sm font-semibold mb-2">Tanggal Pinjam</label>
                 <input type="date" name="tgl_pinjam" value="{{ old('tgl_pinjam', date('Y-m-d')) }}" required
+                    min="{{ today()->subDays(7)->toDateString() }}" max="{{ today()->toDateString() }}"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
             </div>
             <div>

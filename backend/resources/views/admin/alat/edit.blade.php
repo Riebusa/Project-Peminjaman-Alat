@@ -40,6 +40,14 @@
 </style>
 
 <div class="max-w-2xl bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    @if($errors->any())
+        <div class="mb-4 bg-red-50 border border-red-200 text-red-800 p-3 rounded-lg text-sm">
+            @foreach($errors->all() as $error)
+                <p>{{ $error }}</p>
+            @endforeach
+        </div>
+    @endif
+
     <form action="{{ route('admin.alat.update', $alat->id) }}" method="POST" enctype="multipart/form-data">
         @csrf
         @method('PUT')

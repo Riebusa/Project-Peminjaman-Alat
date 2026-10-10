@@ -34,6 +34,13 @@
             {{ session('error') }}
         </div>
     @endif
+    @if($errors->any())
+        <div class="mb-4 bg-red-50 border border-red-200 text-red-800 p-3 rounded-lg text-sm">
+            @foreach($errors->all() as $error)
+                <p>{{ $error }}</p>
+            @endforeach
+        </div>
+    @endif
 
     <form action="{{ route('admin.pengembalian.storeManual') }}" method="POST">
         @csrf
@@ -67,7 +74,7 @@
 
         <div class="mb-6">
             <label class="block text-gray-700 text-sm font-semibold mb-2">Denda Kerusakan (Opsional - Rp)</label>
-            <input type="number" name="denda_kerusakan" value="0" min="0" placeholder="0"
+            <input type="number" name="denda_kerusakan" value="0" min="0" max="10000000" placeholder="0"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
             <p class="text-[11px] text-red-500 mt-1 font-semibold">*Denda keterlambatan (Rp 1.000/hari) akan dihitung otomatis oleh sistem dan ditambahkan ke total denda.</p>
         </div>

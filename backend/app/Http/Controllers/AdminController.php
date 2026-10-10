@@ -189,8 +189,11 @@ class AdminController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:6',
             'role' => 'required|in:admin,petugas,peminjam',
+            'no_hp' => ['nullable', 'digits_between:8,15'],
             'alamat' => 'required|string|max:255',
             'foto_profil' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+        ], [
+            'no_hp.digits_between' => 'No. HP hanya boleh berisi angka (8 sampai 15 digit), tanpa spasi atau tanda lain.',
         ]);
 
         // 1. Siapkan semua data array termasuk file foto
@@ -241,8 +244,12 @@ class AdminController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,' . $id,
             'role' => 'required|in:admin,petugas,peminjam',
+            'no_hp' => ['nullable', 'string', 'max:20', 'regex:/^[0-9+\-\s()]+$/'],
             'alamat' => 'required|string|max:255',
             'foto_profil' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+        ], [
+            'no_hp.regex' => 'No. HP hanya boleh berisi angka, spasi, dan tanda + - ( ).',
+            'no_hp.max'   => 'No. HP maksimal 20 karakter.',
         ]);
 
         $data = [

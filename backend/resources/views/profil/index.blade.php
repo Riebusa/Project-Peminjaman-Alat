@@ -94,7 +94,9 @@
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1">No. HP</label>
-                        <input type="text" name="no_hp" value="{{ old('no_hp', $user->no_hp) }}" class="{{ $inputClass }}">
+                        <input type="text" name="no_hp" value="{{ old('no_hp', $user->no_hp) }}"
+                               inputmode="numeric" pattern="[0-9]{8,15}" maxlength="15"
+                               class="{{ $inputClass }}">
                         @error('no_hp') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
                     </div>
                 </div>

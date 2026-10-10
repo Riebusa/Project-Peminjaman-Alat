@@ -42,9 +42,11 @@ class ProfilController extends Controller
 
         $request->validate([
             'name'        => 'required|string|max:255',
-            'no_hp'       => 'nullable|string|max:20',
+            'no_hp'       => ['nullable', 'digits_between:8,15'],
             'alamat'      => 'required|string|max:255',
             'foto_profil' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+        ], [
+            'no_hp.digits_between' => 'No. HP hanya boleh berisi angka (8 sampai 15 digit), tanpa spasi atau tanda lain.',
         ]);
 
         $data = $request->only(['name', 'no_hp', 'alamat']);

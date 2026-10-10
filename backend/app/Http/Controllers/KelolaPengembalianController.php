@@ -3,12 +3,10 @@
 namespace App\Http\Controllers;
 
 use Carbon\Carbon;
-use App\Models\Alat;
 use App\Models\Peminjaman;
 use App\Models\Pengembalian;
 use App\Services\PeminjamanService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class KelolaPengembalianController extends Controller
 {
@@ -33,11 +31,15 @@ class KelolaPengembalianController extends Controller
         return view('admin.pengembalian.index', compact('belumDiproses', 'sudahDiproses', 'peminjamanAktif'));
     }
 
+    // Proses Terima Pengembalian (Dari Request Peminjam)
     public function prosesTerima(Request $request, $id, PeminjamanService $service)
     {
         $request->validate([
             'kondisi_kembali' => 'required|string|max:255',
-            'denda_kerusakan' => 'nullable|numeric|min:0',
+            'denda_kerusakan' => ['nullable', 'integer', 'min:0', 'max:' . PeminjamanService::MAKS_DENDA_KERUSAKAN],
+        ], [
+            'denda_kerusakan.integer' => 'Denda kerusakan harus berupa angka bulat.',
+            'denda_kerusakan.max'     => 'Denda kerusakan maksimal Rp ' . number_format(PeminjamanService::MAKS_DENDA_KERUSAKAN, 0, ',', '.') . '.',
         ]);
 
         try {
@@ -54,21 +56,20 @@ class KelolaPengembalianController extends Controller
         }
     }
 
-
     // Tolak Request Pengembalian
     public function tolakPengembalian($id)
     {
         $peminjaman = Peminjaman::findOrFail($id);
-        
+
         if ($peminjaman->status === 'menunggu_pengembalian') {
             $tgl_plan = Carbon::parse($peminjaman->tgl_kembali_plan);
             $status_baru = Carbon::today()->greaterThan($tgl_plan) ? 'telat' : 'dipinjam';
 
             $peminjaman->update(['status' => $status_baru]);
-            
+
             return back()->with('success', 'Request pengembalian ditolak. Status dikembalikan ke ' . $status_baru);
         }
-        
+
         return back()->with('error', 'Data tidak valid.');
     }
 
@@ -78,9 +79,9 @@ class KelolaPengembalianController extends Controller
         $peminjamanAktif = Peminjaman::with(['user', 'detailPinjam.alat'])
             ->whereIn('status', ['dipinjam', 'telat'])
             ->get();
-            
+
         $users = $peminjamanAktif->pluck('user')->unique('id');
-            
+
         return view('admin.pengembalian.create', compact('peminjamanAktif', 'users'));
     }
 
@@ -90,7 +91,10 @@ class KelolaPengembalianController extends Controller
         $request->validate([
             'peminjaman_id'   => 'required|exists:peminjaman,id',
             'kondisi_kembali' => 'required|string|max:255',
-            'denda_kerusakan' => 'nullable|numeric|min:0',
+            'denda_kerusakan' => ['nullable', 'integer', 'min:0', 'max:' . PeminjamanService::MAKS_DENDA_KERUSAKAN],
+        ], [
+            'denda_kerusakan.integer' => 'Denda kerusakan harus berupa angka bulat.',
+            'denda_kerusakan.max'     => 'Denda kerusakan maksimal Rp ' . number_format(PeminjamanService::MAKS_DENDA_KERUSAKAN, 0, ',', '.') . '.',
         ]);
 
         try {
@@ -104,7 +108,7 @@ class KelolaPengembalianController extends Controller
             return redirect()->route('admin.pengembalian.index')
                 ->with('success', "Pengembalian manual berhasil. Denda Keterlambatan: Rp " . number_format($hasil['denda_telat'], 0, ',', '.') . " | Total Denda: Rp " . number_format($hasil['denda_total'], 0, ',', '.'));
         } catch (\Exception $e) {
-            return back()->with('error', 'Gagal menyimpan pengembalian: ' . $e->getMessage());
+            return back()->withInput()->with('error', 'Gagal menyimpan pengembalian: ' . $e->getMessage());
         }
     }
 }
