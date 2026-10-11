@@ -167,7 +167,7 @@ class AdminController extends Controller
         // Pencegahan: riwayat peminjaman yang memuat alat ini ikut terhapus (cascade)
         if (DetailPinjam::where('alat_id', $alat->id)->exists()) {
             return redirect()->route('admin.alat.index')
-                ->with('error', "Alat '{$alat->nama_alat}' pernah dipinjam sehingga tidak bisa dihapus. Ubah kondisinya menjadi selain 'Baik' (misalnya 'Tidak Tersedia') agar tidak tampil di katalog.");
+                ->with('error', "Alat '{$alat->nama_alat}' sedang dipinjam. Selesaikan pengembalian terlebih dahulu.");
         }
 
         // Hapus file gambar fisik jika ada menggunakan Storage Facade

@@ -83,22 +83,21 @@ class PeminjamanService
     }
 
     /**
-     * Hapus transaksi permanen. Kalau alatnya masih di tangan peminjam
-     * (dipinjam / telat / menunggu pengembalian), stoknya dikembalikan dulu.
-     * Status dibaca ulang setelah baris dikunci, jadi aman dari proses bersamaan.
+     * Hapus transaksi permanen. Transaksi yang alatnya masih di tangan peminjam
+     * (dipinjam / telat / menunggu pengembalian) tidak boleh dihapus: proses
+     * pengembaliannya dulu. Status dibaca setelah baris dikunci, jadi aman dari
+     * proses bersamaan.
+     *
+     * @throws \DomainException bila transaksi masih dipinjam
      */
     public function hapus(int $id): void
     {
         DB::transaction(function () use ($id) {
-            $peminjaman = Peminjaman::with('detailPinjam')->lockForUpdate()->findOrFail($id);
+            $peminjaman = Peminjaman::lockForUpdate()->findOrFail($id);
 
             if (in_array($peminjaman->status, self::STATUS_BISA_DIKEMBALIKAN, true)) {
-                foreach ($peminjaman->detailPinjam as $detail) {
-                    $alat = Alat::lockForUpdate()->find($detail->alat_id);
-                    if ($alat) {
-                        $alat->increment('stok', $detail->jumlah);
-                    }
-                }
+                $status = str_replace('_', ' ', $peminjaman->status);
+                throw new \DomainException("Transaksi ini masih berstatus '{$status}' (alat belum kembali) sehingga tidak bisa dihapus. Proses pengembaliannya terlebih dahulu.");
             }
 
             $peminjaman->detailPinjam()->delete();

@@ -122,14 +122,25 @@
                                     <span class="text-xs text-gray-400 italic">Lihat di menu Pengembalian</span>
                                 @endif
 
-                                <form action="{{ route('admin.peminjaman.destroy', $peminjaman->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus transaksi ini? Jika alat sudah berstatus dipinjam, stok akan otomatis dikembalikan ke gudang.')" class="w-full mt-1">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 border border-gray-300 hover:border-red-300 text-xs px-3 py-1.5 rounded font-bold w-full transition flex items-center justify-center gap-1">
+                                @if($isDiajukan)
+                                    <!-- Pengajuan yang belum diproses boleh dihapus -->
+                                    <form action="{{ route('admin.peminjaman.destroy', $peminjaman->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus pengajuan ini?')" class="w-full mt-1">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 border border-gray-300 hover:border-red-300 text-xs px-3 py-1.5 rounded font-bold w-full transition flex items-center justify-center gap-1">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                            Hapus
+                                        </button>
+                                    </form>
+                                @else
+                                    <!-- Sedang dipinjam: tidak bisa dihapus sebelum alat dikembalikan -->
+                                    <button type="button" disabled
+                                            title="Alat masih dipinjam. Proses pengembaliannya dulu sebelum dihapus."
+                                            class="bg-gray-100 text-gray-300 border border-gray-200 text-xs px-3 py-1.5 rounded font-bold w-full mt-1 cursor-not-allowed flex items-center justify-center gap-1">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                         Hapus
                                     </button>
-                                </form>
+                                @endif
                             </td>
                         </tr>
                         @empty

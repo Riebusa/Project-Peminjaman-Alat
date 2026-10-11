@@ -189,14 +189,16 @@ class KelolaPeminjamanController extends Controller
         }
     }
 
-    // Menghapus data peminjaman permanen (stok disesuaikan di service)
+    // Menghapus data peminjaman permanen (aturannya ada di service)
     public function destroy($id, PeminjamanService $service)
     {
         try {
             $service->hapus((int) $id);
-            return back()->with('success', 'Data transaksi berhasil dihapus permanen dan stok alat telah disesuaikan.');
+            return back()->with('success', 'Data transaksi berhasil dihapus permanen.');
         } catch (ModelNotFoundException $e) {
             return back()->with('error', 'Transaksi tidak ditemukan (mungkin sudah dihapus).');
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
         } catch (\Exception $e) {
             return back()->with('error', 'Gagal menghapus data: ' . $e->getMessage());
         }
