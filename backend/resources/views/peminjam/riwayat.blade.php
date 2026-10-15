@@ -159,4 +159,10 @@
         </div>
         @endif
     </div>
+        @if(session('kosongkan_keranjang'))
+        <script>
+            // Pengajuan berhasil: kosongkan keranjang di browser
+            try { localStorage.removeItem('keranjang_{{ auth()->id() }}'); } catch (e) {}
+        </script>
+    @endif
 @endsection

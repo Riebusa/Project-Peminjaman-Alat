@@ -16,6 +16,7 @@ class PeminjamController extends Controller
     // Aturan peminjaman (ubah angkanya di sini kalau kebijakan berubah)
     private const MAKS_HARI_PINJAM = 14;
     private const MAKS_PENGAJUAN_MENUNGGU = 3;
+    private const MAKS_JENIS_ALAT = 10;
     private const KONDISI_BISA_DIPINJAM = 'baik';
 
     // Jumlah peminjaman milik user yang sudah lewat tenggat dan belum dikembalikan
@@ -65,10 +66,11 @@ class PeminjamController extends Controller
             'kategoris'    => Kategori::orderBy('nama_kategori')->get(),
             'alasanBlokir' => $this->alasanBlokir(),
             'maksHari'     => self::MAKS_HARI_PINJAM,
+            'maksAlat'     => self::MAKS_JENIS_ALAT,
         ]);
     }
 
-    // 2. Mengajukan peminjaman baru
+    // 2. Mengajukan peminjaman baru (satu pengajuan boleh berisi beberapa alat dari keranjang)
     public function ajukanPeminjaman(Request $request)
     {
         $jumlahAlat = is_array($request->alat_id) ? count($request->alat_id) : 0;
@@ -78,13 +80,15 @@ class PeminjamController extends Controller
                 'required', 'date', 'after_or_equal:today',
                 'before_or_equal:' . today()->addDays(self::MAKS_HARI_PINJAM)->toDateString(),
             ],
-            'alat_id'   => ['required', 'array', 'min:1'],
+            'alat_id'   => ['required', 'array', 'min:1', 'max:' . self::MAKS_JENIS_ALAT],
             'alat_id.*' => ['required', 'integer', 'distinct', 'exists:alat,id'],
             'jumlah'    => ['required', 'array', 'size:' . $jumlahAlat],
             'jumlah.*'  => ['required', 'integer', 'min:1'],
         ], [
             'tgl_kembali_plan.after_or_equal'  => 'Tanggal kembali tidak boleh sebelum hari ini.',
             'tgl_kembali_plan.before_or_equal' => 'Lama peminjaman maksimal ' . self::MAKS_HARI_PINJAM . ' hari.',
+            'alat_id.required'                 => 'Keranjang masih kosong. Tambahkan alat terlebih dahulu.',
+            'alat_id.max'                      => 'Maksimal ' . self::MAKS_JENIS_ALAT . ' jenis alat dalam satu pengajuan.',
             'alat_id.*.exists'                 => 'Alat yang dipilih tidak ditemukan.',
             'alat_id.*.distinct'               => 'Alat yang sama tidak boleh dipilih dua kali.',
             'jumlah.*.integer'                 => 'Jumlah pinjam harus berupa angka bulat.',
@@ -130,7 +134,11 @@ class PeminjamController extends Controller
             }
 
             DB::commit();
-            return redirect()->route('peminjam.riwayat')->with('success', 'Pengajuan peminjaman berhasil dikirim! Menunggu persetujuan Petugas.');
+
+            // 'kosongkan_keranjang' dibaca halaman Riwayat untuk menghapus isi keranjang di browser
+            return redirect()->route('peminjam.riwayat')
+                ->with('success', 'Pengajuan peminjaman berhasil dikirim! Menunggu persetujuan Petugas.')
+                ->with('kosongkan_keranjang', true);
         } catch (\Exception $e) {
             DB::rollback();
             return redirect()->back()->with('error', 'Gagal mengajukan peminjaman: ' . $e->getMessage());

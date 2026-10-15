@@ -115,7 +115,7 @@
                     @yield('header-title', 'Dashboard')
                 </div>
                 <div>
-                    <form action="{{ route('logout') }}" method="POST">
+                    <form action="{{ route('logout') }}" method="POST" onsubmit="return confirm('Yakin untuk logout?')">
                         @csrf
                         <button type="submit" class="bg-red-500 hover:bg-red-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
                             Logout

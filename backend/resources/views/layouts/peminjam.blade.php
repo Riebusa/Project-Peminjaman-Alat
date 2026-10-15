@@ -51,7 +51,7 @@
                     </a>
 
                     <!-- Tombol Logout -->
-                    <form action="{{ route('logout') }}" method="POST">
+                    <form action="{{ route('logout') }}" method="POST" onsubmit="return confirm('Yakin untuk logout?')">
                         @csrf
                         <button type="submit" class="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-sm font-bold transition">
                             Logout
