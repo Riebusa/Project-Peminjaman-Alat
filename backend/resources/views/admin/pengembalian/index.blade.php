@@ -95,6 +95,17 @@
                                     <div class="mb-2">
                                         <input type="text" name="kondisi_kembali" required placeholder="Kondisi Alat (Cth: Baik)" class="w-full text-xs border border-gray-300 p-1.5 rounded focus:ring-1 focus:ring-purple-500">
                                     </div>
+                                    <div class="mb-2 bg-white border border-gray-200 rounded p-1.5">
+                                        <p class="text-[10px] font-semibold text-gray-600 mb-1">Unit tidak layak (rusak berat/hilang):</p>
+                                        @foreach($peminjaman->detailPinjam as $detail)
+                                            <label class="flex items-center justify-between gap-2 text-[11px] text-gray-700 mb-1">
+                                                <span>{{ $detail->alat->nama_alat ?? 'Dihapus' }} ({{ $detail->jumlah }})</span>
+                                                <input type="number" name="tidak_layak[{{ $detail->id }}]" value="0" min="0" max="{{ $detail->jumlah }}" step="1"
+                                                    class="w-14 text-xs text-right border border-gray-300 p-1 rounded focus:ring-1 focus:ring-purple-500">
+                                            </label>
+                                        @endforeach
+                                        <span class="text-[10px] text-gray-500">*Tidak ditambahkan ke stok. Biarkan 0 jika semua layak.</span>
+                                    </div>
                                     <div class="mb-2">
                                         <input type="number" name="denda_kerusakan" placeholder="Denda Kerusakan (Opsional)" min="0" max="10000000" class="w-full text-xs border border-gray-300 p-1.5 rounded focus:ring-1 focus:ring-purple-500">
                                         <span class="text-[10px] text-gray-500">*Denda telat dihitung otomatis</span>

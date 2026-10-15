@@ -72,6 +72,13 @@
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
         </div>
 
+        <!-- Unit rusak berat / hilang (terisi otomatis setelah transaksi dipilih) -->
+        <div id="tidak_layak_wrap" class="mb-4 hidden">
+            <label class="block text-gray-700 text-sm font-semibold mb-1">Unit Tidak Layak (Rusak Berat / Hilang)</label>
+            <p class="text-[11px] text-gray-500 mb-2">Unit ini tidak akan ditambahkan kembali ke stok. Biarkan 0 jika semua layak.</p>
+            <div id="tidak_layak_box" class="space-y-1.5"></div>
+        </div>
+
         <div class="mb-6">
             <label class="block text-gray-700 text-sm font-semibold mb-2">Denda Kerusakan (Opsional - Rp)</label>
             <input type="number" name="denda_kerusakan" value="0" min="0" max="10000000" placeholder="0"
@@ -108,9 +115,49 @@
             return {
                 id: item.id,
                 user_id: item.user_id,
-                text: alatText + ' | Tgl Pinjam: ' + item.tgl_pinjam
+                text: alatText + ' | Tgl Pinjam: ' + item.tgl_pinjam,
+                details: (item.detail_pinjam || []).map(function(d) {
+                    return {
+                        id: d.id,
+                        nama: (d.alat && d.alat.nama_alat) ? d.alat.nama_alat : 'Dihapus',
+                        jumlah: d.jumlah
+                    };
+                })
             };
         });
+
+        // Tampilkan input "unit tidak layak" untuk tiap alat pada transaksi yang dipilih
+        function renderTidakLayak(peminjamanId) {
+            const wrap = document.getElementById('tidak_layak_wrap');
+            const box = document.getElementById('tidak_layak_box');
+            box.innerHTML = '';
+
+            const trx = transaksiAktif.find(function(t) { return t.id == peminjamanId; });
+            if (!trx || trx.details.length === 0) {
+                wrap.classList.add('hidden');
+                return;
+            }
+
+            trx.details.forEach(function(d) {
+                // Properti DOM / textContent: aman dari XSS
+                const row = document.createElement('label');
+                row.className = 'flex items-center justify-between gap-3 text-sm text-gray-700';
+                const teks = document.createElement('span');
+                teks.textContent = d.nama + ' (dipinjam ' + d.jumlah + ' unit)';
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.name = 'tidak_layak[' + d.id + ']';
+                input.min = 0;
+                input.max = d.jumlah;
+                input.step = 1;
+                input.value = 0;
+                input.className = 'w-20 px-2 py-1 border border-gray-300 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-purple-500';
+                row.appendChild(teks);
+                row.appendChild(input);
+                box.appendChild(row);
+            });
+            wrap.classList.remove('hidden');
+        }
 
         // Inisialisasi TomSelect untuk Alat
         let peminjamanSelect = new TomSelect("#peminjaman_select", {
@@ -119,6 +166,7 @@
             searchField: 'text',
             options: [],
             create: false,
+            onChange: renderTidakLayak,
         });
         peminjamanSelect.disable();
 

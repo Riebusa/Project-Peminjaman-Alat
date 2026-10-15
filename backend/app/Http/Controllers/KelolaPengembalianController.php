@@ -68,7 +68,11 @@ class KelolaPengembalianController extends Controller
         $request->validate([
             'kondisi_kembali' => 'required|string|max:255',
             'denda_kerusakan' => ['nullable', 'integer', 'min:0', 'max:' . PeminjamanService::MAKS_DENDA_KERUSAKAN],
+            'tidak_layak'     => ['nullable', 'array'],
+            'tidak_layak.*'   => ['nullable', 'integer', 'min:0'],
         ], [
+            'tidak_layak.*.integer'   => 'Jumlah unit tidak layak harus berupa angka bulat.',
+            'tidak_layak.*.min'       => 'Jumlah unit tidak layak tidak boleh negatif.',
             'denda_kerusakan.integer' => 'Denda kerusakan harus berupa angka bulat.',
             'denda_kerusakan.max'     => 'Denda kerusakan maksimal Rp ' . number_format(PeminjamanService::MAKS_DENDA_KERUSAKAN, 0, ',', '.') . '.',
         ]);
@@ -78,10 +82,13 @@ class KelolaPengembalianController extends Controller
                 (int) $id,
                 $request->kondisi_kembali,
                 $request->denda_kerusakan,
-                auth()->id()
+                auth()->id(),
+                $request->input('tidak_layak', [])
             );
 
-            return back()->with('success', "Pengembalian berhasil. Keterlambatan: {$hasil['hari_telat']} hari. Total Denda: Rp " . number_format($hasil['denda_total'], 0, ',', '.'));
+            $catatan = $hasil['unit_tidak_layak'] > 0 ? " {$hasil['unit_tidak_layak']} unit tidak layak tidak dimasukkan ke stok." : '';
+
+            return back()->with('success', "Pengembalian berhasil.{$catatan} Keterlambatan: {$hasil['hari_telat']} hari. Total Denda: Rp " . number_format($hasil['denda_total'], 0, ',', '.'));
         } catch (\Exception $e) {
             return back()->with('error', 'Gagal: ' . $e->getMessage());
         }
@@ -119,7 +126,11 @@ class KelolaPengembalianController extends Controller
             'peminjaman_id'   => 'required|exists:peminjaman,id',
             'kondisi_kembali' => 'required|string|max:255',
             'denda_kerusakan' => ['nullable', 'integer', 'min:0', 'max:' . PeminjamanService::MAKS_DENDA_KERUSAKAN],
+            'tidak_layak'     => ['nullable', 'array'],
+            'tidak_layak.*'   => ['nullable', 'integer', 'min:0'],
         ], [
+            'tidak_layak.*.integer'   => 'Jumlah unit tidak layak harus berupa angka bulat.',
+            'tidak_layak.*.min'       => 'Jumlah unit tidak layak tidak boleh negatif.',
             'denda_kerusakan.integer' => 'Denda kerusakan harus berupa angka bulat.',
             'denda_kerusakan.max'     => 'Denda kerusakan maksimal Rp ' . number_format(PeminjamanService::MAKS_DENDA_KERUSAKAN, 0, ',', '.') . '.',
         ]);
@@ -129,11 +140,14 @@ class KelolaPengembalianController extends Controller
                 (int) $request->peminjaman_id,
                 $request->kondisi_kembali,
                 $request->denda_kerusakan,
-                auth()->id()
+                auth()->id(),
+                $request->input('tidak_layak', [])
             );
 
+            $catatan = $hasil['unit_tidak_layak'] > 0 ? " {$hasil['unit_tidak_layak']} unit tidak layak tidak dimasukkan ke stok." : '';
+
             return redirect()->route('admin.pengembalian.index')
-                ->with('success', "Pengembalian manual berhasil. Denda Keterlambatan: Rp " . number_format($hasil['denda_telat'], 0, ',', '.') . " | Total Denda: Rp " . number_format($hasil['denda_total'], 0, ',', '.'));
+                ->with('success', "Pengembalian manual berhasil.{$catatan} Denda Keterlambatan: Rp " . number_format($hasil['denda_telat'], 0, ',', '.') . " | Total Denda: Rp " . number_format($hasil['denda_total'], 0, ',', '.'));
         } catch (\Exception $e) {
             return back()->withInput()->with('error', 'Gagal menyimpan pengembalian: ' . $e->getMessage());
         }
