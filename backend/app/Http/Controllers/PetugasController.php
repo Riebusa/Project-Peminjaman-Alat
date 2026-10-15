@@ -24,7 +24,8 @@ class PetugasController extends Controller
             'peminjamanDiajukan'   => Peminjaman::where('status', 'diajukan')->count(),
             'peminjamanAktif'      => Peminjaman::whereIn('status', ['dipinjam', 'telat'])->count(),
             'menungguPengembalian' => Peminjaman::where('status', 'menunggu_pengembalian')->count(),
-            'peminjamanTelat'      => Peminjaman::whereIn('status', ['dipinjam', 'telat'])
+            // Sama dengan kartu "Lewat Tenggat" di halaman pengembalian
+            'peminjamanTelat'      => Peminjaman::whereIn('status', PeminjamanService::STATUS_BISA_DIKEMBALIKAN)
                 ->whereDate('tgl_kembali_plan', '<', today())->count(),
         ]);
     }
@@ -157,9 +158,13 @@ class PetugasController extends Controller
         $request->validate([
             'kondisi_kembali' => 'required|string|max:255',
             'denda_kerusakan' => ['nullable', 'integer', 'min:0', 'max:' . PeminjamanService::MAKS_DENDA_KERUSAKAN],
+            'tidak_layak'     => ['nullable', 'array'],
+            'tidak_layak.*'   => ['nullable', 'integer', 'min:0'],
         ], [
             'denda_kerusakan.integer' => 'Denda kerusakan harus berupa angka bulat.',
             'denda_kerusakan.max'     => 'Denda kerusakan maksimal Rp ' . number_format(PeminjamanService::MAKS_DENDA_KERUSAKAN, 0, ',', '.') . '.',
+            'tidak_layak.*.integer'   => 'Jumlah unit tidak layak harus berupa angka bulat.',
+            'tidak_layak.*.min'       => 'Jumlah unit tidak layak tidak boleh negatif.',
         ]);
 
         try {
@@ -167,10 +172,15 @@ class PetugasController extends Controller
                 (int) $peminjamanId,
                 $request->kondisi_kembali,
                 $request->denda_kerusakan,
-                auth()->id()
+                auth()->id(),
+                $request->input('tidak_layak', [])
             );
 
-            return redirect()->back()->with('success', "Pengembalian dicatat dan stok dipulihkan. Telat: {$hasil['hari_telat']} hari. Total denda: Rp " . number_format($hasil['denda_total'], 0, ',', '.'));
+            $pesan = $hasil['unit_tidak_layak'] > 0
+                ? "Pengembalian dicatat. {$hasil['unit_tidak_layak']} unit tidak layak TIDAK dimasukkan ke stok, sisanya dipulihkan."
+                : 'Pengembalian dicatat dan stok dipulihkan.';
+
+            return redirect()->back()->with('success', "{$pesan} Telat: {$hasil['hari_telat']} hari. Total denda: Rp " . number_format($hasil['denda_total'], 0, ',', '.'));
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Gagal memproses pengembalian: ' . $e->getMessage());
         }

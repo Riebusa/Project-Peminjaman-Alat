@@ -26,7 +26,7 @@ class PeminjamanSeeder extends Seeder
                 'user_id' => 5,
                 'tgl_pinjam' => '2026-06-03',
                 'tgl_kembali_plan' => '2026-06-06',
-                'status' => 'telat',
+                'status' => 'dikembalikan', // sudah punya data pengembalian di PengembalianSeeder
             ],
             [
                 'user_id' => 3,

@@ -8,6 +8,7 @@ use App\Models\Pengembalian;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Satu-satunya tempat yang boleh mengubah stok alat akibat transaksi peminjaman.
@@ -117,13 +118,47 @@ class PeminjamanService
         return $hariIni->greaterThan($tglPlan) ? (int) $tglPlan->diffInDays($hariIni) : 0;
     }
 
-    public function terimaPengembalian(int $id, string $kondisiKembali, $dendaKerusakan, int $petugasId): array
+    /**
+     * @param array<int,int|string|null> $tidakLayak  [detail_pinjam.id => jumlah unit yang rusak berat / hilang].
+     *        Unit ini TIDAK dikembalikan ke stok (supaya tidak bisa dipinjam lagi),
+     *        dan dicatat pada kondisi_kembali. Kosong = semua unit layak (perilaku lama).
+     */
+    public function terimaPengembalian(int $id, string $kondisiKembali, $dendaKerusakan, int $petugasId, array $tidakLayak = []): array
     {
-        return DB::transaction(function () use ($id, $kondisiKembali, $dendaKerusakan, $petugasId) {
-            $peminjaman = Peminjaman::with('detailPinjam')->lockForUpdate()->findOrFail($id);
+        return DB::transaction(function () use ($id, $kondisiKembali, $dendaKerusakan, $petugasId, $tidakLayak) {
+            $peminjaman = Peminjaman::with('detailPinjam.alat')->lockForUpdate()->findOrFail($id);
 
             if (!in_array($peminjaman->status, self::STATUS_BISA_DIKEMBALIKAN, true)) {
                 throw new Exception("Peminjaman ini berstatus '{$peminjaman->status}' dan tidak bisa diproses sebagai pengembalian.");
+            }
+
+            // Susun jumlah unit tidak layak per baris detail + validasi terhadap data transaksi
+            $unitRusak = [];
+            $catatan = [];
+            foreach ($tidakLayak as $detailId => $jumlah) {
+                $jumlah = (int) $jumlah;
+                if ($jumlah <= 0) {
+                    continue;
+                }
+
+                $detail = $peminjaman->detailPinjam->firstWhere('id', (int) $detailId);
+                if (!$detail) {
+                    throw new Exception('Data alat tidak layak tidak sesuai dengan transaksi ini.');
+                }
+                if ($jumlah > $detail->jumlah) {
+                    $nama = $detail->alat->nama_alat ?? 'alat';
+                    throw new Exception("Jumlah tidak layak untuk '{$nama}' ({$jumlah}) melebihi jumlah yang dipinjam ({$detail->jumlah}).");
+                }
+
+                $unitRusak[$detail->id] = $jumlah;
+                $catatan[] = ($detail->alat->nama_alat ?? 'Alat') . " ({$jumlah} unit)";
+            }
+
+            // Catatan ditempel ke kondisi_kembali; kolomnya hanya 255 karakter
+            if (!empty($catatan)) {
+                $akhiran = ' | TIDAK LAYAK (tidak masuk stok): ' . implode(', ', $catatan);
+                $kondisiKembali = Str::limit($kondisiKembali, max(0, 255 - mb_strlen($akhiran)), '') . $akhiran;
+                $kondisiKembali = mb_substr($kondisiKembali, 0, 255);
             }
 
             $hariTelat  = $this->hitungHariTelat($peminjaman->tgl_kembali_plan);
@@ -140,18 +175,26 @@ class PeminjamanService
 
             $peminjaman->update(['status' => 'dikembalikan']);
 
+            $unitTidakLayak = 0;
             foreach ($peminjaman->detailPinjam as $detail) {
-                $alat = Alat::lockForUpdate()->find($detail->alat_id);
-                if ($alat) {
-                    $alat->increment('stok', $detail->jumlah);
+                $rusak   = $unitRusak[$detail->id] ?? 0;
+                $kembali = $detail->jumlah - $rusak;
+                $unitTidakLayak += $rusak;
+
+                if ($kembali > 0) {
+                    $alat = Alat::lockForUpdate()->find($detail->alat_id);
+                    if ($alat) {
+                        $alat->increment('stok', $kembali);
+                    }
                 }
             }
 
             return [
-                'pengembalian' => $pengembalian,
-                'hari_telat'   => $hariTelat,
-                'denda_telat'  => $dendaTelat,
-                'denda_total'  => $dendaTotal,
+                'pengembalian'     => $pengembalian,
+                'hari_telat'       => $hariTelat,
+                'denda_telat'      => $dendaTelat,
+                'denda_total'      => $dendaTotal,
+                'unit_tidak_layak' => $unitTidakLayak,
             ];
         });
     }

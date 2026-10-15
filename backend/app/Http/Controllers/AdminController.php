@@ -19,7 +19,8 @@ class AdminController extends Controller
     public function index(PeminjamanService $service)
     {
         // Peminjaman yang sudah lewat tenggat dan belum dikembalikan
-        $queryTelat = Peminjaman::whereIn('status', ['dipinjam', 'telat'])
+        // (termasuk yang sudah diminta kembali tapi belum diproses: dendanya tetap berjalan)
+        $queryTelat = Peminjaman::whereIn('status', PeminjamanService::STATUS_BISA_DIKEMBALIKAN)
             ->whereDate('tgl_kembali_plan', '<', today());
 
         $jumlahTelat = (clone $queryTelat)->count();

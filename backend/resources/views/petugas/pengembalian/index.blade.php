@@ -122,7 +122,11 @@
                                 'tglPlan'    => $tglPlan->translatedFormat('d M Y'),
                                 'hariTelat'  => $hari,
                                 'dendaTelat' => $dendaTelat,
-                                'alat'       => $pinjam->detailPinjam->map(fn ($d) => ($d->alat->nama_alat ?? 'Alat Terhapus') . ' (' . $d->jumlah . 'x)')->values(),
+                                'alat'       => $pinjam->detailPinjam->map(fn ($d) => [
+                                    'id'     => $d->id,
+                                    'nama'   => $d->alat->nama_alat ?? 'Alat Terhapus',
+                                    'jumlah' => $d->jumlah,
+                                ])->values(),
                             ];
                         @endphp
                     <tr class="hover:bg-slate-50 transition-colors {{ $isTerlambat ? 'bg-red-50/30' : '' }}">
@@ -293,7 +297,7 @@
 
 <!-- Modal Popup Proses Pengembalian -->
 <div id="modalPengembalian" class="fixed inset-0 z-50 hidden bg-gray-900 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
-    <div class="relative mx-auto p-5 border w-96 max-w-[92vw] shadow-lg rounded-xl bg-white">
+    <div class="relative mx-auto p-5 border w-96 max-w-[92vw] max-h-[92vh] overflow-y-auto shadow-lg rounded-xl bg-white">
         <h3 class="text-lg font-bold text-gray-900 mb-3 border-b pb-2">Form Pengembalian Alat</h3>
 
         <!-- Detail transaksi yang sedang diproses -->
@@ -320,6 +324,13 @@
             <div class="mb-4">
                 <label class="block text-sm font-semibold text-gray-700 mb-1">Kondisi Alat Saat Kembali</label>
                 <textarea name="kondisi_kembali" id="inputKondisi" required rows="2" maxlength="255" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm" placeholder="Misal: Lengkap dan berfungsi baik..."></textarea>
+            </div>
+
+            <!-- Unit rusak berat / hilang: tidak dikembalikan ke stok -->
+            <div class="mb-4">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Unit Tidak Layak (Rusak Berat / Hilang)</label>
+                <p class="text-[11px] text-slate-500 mb-2">Isi jumlah unit yang tidak bisa dipakai lagi. Unit ini tidak akan ditambahkan kembali ke stok. Biarkan 0 jika semua layak.</p>
+                <div id="mdlTidakLayak" class="space-y-1.5"></div>
             </div>
 
             <div class="mb-4">
@@ -386,10 +397,29 @@
         document.getElementById('mdlPeriode').innerText = d.tglPinjam + ' s/d ' + d.tglPlan;
         const ul = document.getElementById('mdlAlat');
         ul.innerHTML = '';
-        d.alat.forEach(function (nama) {
+        const boxRusak = document.getElementById('mdlTidakLayak');
+        boxRusak.innerHTML = '';
+        d.alat.forEach(function (a) {
+            // textContent / properti DOM: aman dari XSS
             const li = document.createElement('li');
-            li.textContent = nama; // textContent: aman dari XSS
+            li.textContent = a.nama + ' (' + a.jumlah + 'x)';
             ul.appendChild(li);
+
+            const row = document.createElement('label');
+            row.className = 'flex items-center justify-between gap-2 text-xs text-slate-700';
+            const teks = document.createElement('span');
+            teks.textContent = a.nama + ' (dipinjam ' + a.jumlah + ')';
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.name = 'tidak_layak[' + a.id + ']';
+            input.min = 0;
+            input.max = a.jumlah;
+            input.step = 1;
+            input.value = 0;
+            input.className = 'w-16 px-2 py-1 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-2 focus:ring-purple-500';
+            row.appendChild(teks);
+            row.appendChild(input);
+            boxRusak.appendChild(row);
         });
 
         // Peringatan telat
