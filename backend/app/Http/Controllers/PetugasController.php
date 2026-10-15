@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Peminjaman;
+use App\Models\Pengembalian;
 use App\Services\PeminjamanService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -70,20 +71,84 @@ class PetugasController extends Controller
         }
     }
 
-    // Daftar alat yang sedang dipinjam / diminta dikembalikan oleh peminjam
-    public function indexPengembalian(PeminjamanService $service)
+    // Memantau pengembalian: tab "Sedang Dipinjam" (dengan filter) dan tab "Riwayat"
+    public function indexPengembalian(Request $request, PeminjamanService $service)
     {
-        $peminjamanAktif = Peminjaman::with(['user', 'detailPinjam.alat'])
-            ->whereIn('status', ['dipinjam', 'telat', 'menunggu_pengembalian'])
-            ->latest()
-            ->get();
+        $search = trim((string) $request->input('search'));
+
+        // Tab aktif (supaya tidak kembali ke tab pertama saat cari / pindah halaman)
+        $tab = $request->input('tab', $request->has('riwayat_page') ? 'riwayat' : 'aktif');
+        if (!in_array($tab, ['aktif', 'riwayat'], true)) {
+            $tab = 'aktif';
+        }
+
+        $filter = $request->input('filter', 'semua');
+        if (!in_array($filter, ['semua', 'menunggu', 'telat', 'dipinjam'], true)) {
+            $filter = 'semua';
+        }
+
+        $statusAktif = PeminjamanService::STATUS_BISA_DIKEMBALIKAN;
+
+        // ---- Kartu ringkasan (tidak terpengaruh pencarian / filter) ----
+        $ringkasan = [
+            'aktif'    => Peminjaman::whereIn('status', $statusAktif)->count(),
+            'menunggu' => Peminjaman::where('status', 'menunggu_pengembalian')->count(),
+            'telat'    => Peminjaman::whereIn('status', $statusAktif)
+                ->whereDate('tgl_kembali_plan', '<', today())->count(),
+            'selesai'  => Peminjaman::where('status', 'dikembalikan')->count(),
+        ];
+
+        // ---- Tab 1: peminjaman yang alatnya masih di tangan peminjam ----
+        $queryAktif = Peminjaman::with(['user', 'detailPinjam.alat'])
+            ->whereIn('status', $statusAktif)
+            ->when($filter === 'menunggu', fn ($q) => $q->where('status', 'menunggu_pengembalian'))
+            ->when($filter === 'telat', fn ($q) => $q->whereDate('tgl_kembali_plan', '<', today()))
+            ->when($filter === 'dipinjam', fn ($q) => $q
+                ->whereIn('status', ['dipinjam', 'telat'])
+                ->whereDate('tgl_kembali_plan', '>=', today()))
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($w) use ($search) {
+                    $w->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%"))
+                      ->orWhereHas('detailPinjam.alat', fn ($a) => $a->where('nama_alat', 'like', "%{$search}%"));
+                });
+            })
+            // Request peminjam di atas, lalu yang paling dekat / paling lewat tenggat
+            ->orderByRaw("CASE WHEN status = 'menunggu_pengembalian' THEN 0 ELSE 1 END")
+            ->orderBy('tgl_kembali_plan')
+            ->orderBy('id');
+
+        $peminjamanAktif = $queryAktif
+            ->paginate(10, ['*'], 'aktif_page')
+            ->withQueryString()
+            ->appends('tab', 'aktif');
 
         // Hari telat dihitung dengan logika yang sama seperti saat denda disimpan
-        $hariTelat = $peminjamanAktif->mapWithKeys(
+        $hariTelat = $peminjamanAktif->getCollection()->mapWithKeys(
             fn ($p) => [$p->id => $service->hitungHariTelat($p->tgl_kembali_plan)]
         );
 
-        return view('petugas.pengembalian.index', compact('peminjamanAktif', 'hariTelat'));
+        // ---- Tab 2: riwayat pengembalian yang sudah diproses ----
+        $queryRiwayat = Pengembalian::with(['peminjaman.user', 'peminjaman.detailPinjam.alat', 'petugas'])
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($w) use ($search) {
+                    $w->whereHas('peminjaman.user', fn ($u) => $u->where('name', 'like', "%{$search}%"))
+                      ->orWhereHas('peminjaman.detailPinjam.alat', fn ($a) => $a->where('nama_alat', 'like', "%{$search}%"))
+                      ->orWhere('kondisi_kembali', 'like', "%{$search}%");
+                });
+            });
+
+        $totalDendaRiwayat = (int) (clone $queryRiwayat)->sum('denda');
+
+        $riwayat = $queryRiwayat->latest('tgl_kembali')->latest('id')
+            ->paginate(10, ['*'], 'riwayat_page')
+            ->withQueryString()
+            ->appends('tab', 'riwayat');
+
+        return view('petugas.pengembalian.index', compact(
+            'peminjamanAktif', 'hariTelat', 'riwayat', 'ringkasan',
+            'totalDendaRiwayat', 'search', 'tab', 'filter'
+        ));
     }
 
     // Proses pengembalian: denda telat dihitung otomatis, denda kerusakan dari input
