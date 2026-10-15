@@ -179,12 +179,23 @@
         </aside>
     </div>
 
+    @php
+        // Disiapkan di sini karena ekspresi @json tidak boleh memuat koma
+        $koreksiKeranjang = [
+            'hapus' => session('koreksi_keranjang.hapus', []),
+            'stok'  => (object) session('koreksi_keranjang.stok', []),
+        ];
+    @endphp
+
     <script>
         (function () {
             const KUNCI = 'keranjang_{{ auth()->id() }}';
             const MAKS_ALAT = {{ $maksAlat }};
             const DIBLOKIR = @json((bool) $alasanBlokir);
             const BUKA_OTOMATIS = @json($errors->any() || session()->has('error'));
+
+            // Koreksi dari server bila ada alat di keranjang yang tidak tersedia / stoknya berubah
+            const KOREKSI = @json($koreksiKeranjang);
 
             const panel = document.getElementById('panel-keranjang');
             const daftar = document.getElementById('daftar-keranjang');
@@ -216,6 +227,35 @@
                 toast.classList.remove('hidden');
                 clearTimeout(timerToast);
                 timerToast = setTimeout(function () { toast.classList.add('hidden'); }, 2200);
+            }
+
+            // ---------- Terapkan koreksi dari server ----------
+            function terapkanKoreksi() {
+                const adaHapus = Array.isArray(KOREKSI.hapus) && KOREKSI.hapus.length > 0;
+                const adaStok = KOREKSI.stok && Object.keys(KOREKSI.stok).length > 0;
+                if (!adaHapus && !adaStok) return;
+
+                let items = baca();
+
+                // Buang alat yang sudah tidak tersedia
+                if (adaHapus) {
+                    items = items.filter(function (i) { return KOREKSI.hapus.indexOf(i.id) === -1; });
+                }
+
+                // Sesuaikan stok dan jumlah dengan stok terkini
+                if (adaStok) {
+                    items.forEach(function (i) {
+                        const stokBaru = KOREKSI.stok[i.id];
+                        if (stokBaru !== undefined) {
+                            i.stok = stokBaru;
+                            i.jumlah = Math.max(1, Math.min(i.jumlah, stokBaru));
+                        }
+                    });
+                    // Stok habis: keluarkan dari keranjang
+                    items = items.filter(function (i) { return i.stok > 0; });
+                }
+
+                simpan(items);
             }
 
             // ---------- Operasi keranjang ----------
@@ -364,6 +404,7 @@
             });
 
             // ---------- Mulai ----------
+            terapkanKoreksi();
             render();
             if (BUKA_OTOMATIS && baca().length > 0) {
                 buka();

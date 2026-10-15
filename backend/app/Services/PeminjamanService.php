@@ -25,10 +25,14 @@ class PeminjamanService
     public function setujui(int $id): Peminjaman
     {
         return DB::transaction(function () use ($id) {
-            $peminjaman = Peminjaman::with('detailPinjam')->lockForUpdate()->findOrFail($id);
+            $peminjaman = Peminjaman::with(['detailPinjam', 'user'])->lockForUpdate()->findOrFail($id);
 
             if ($peminjaman->status !== 'diajukan') {
                 throw new Exception("Peminjaman ini berstatus '{$peminjaman->status}', hanya status 'diajukan' yang bisa disetujui.");
+            }
+
+            if ($peminjaman->user && !$peminjaman->user->is_active) {
+                throw new Exception('Akun peminjam sudah dinonaktifkan sehingga pengajuan ini tidak bisa disetujui. Tolak saja pengajuan ini.');
             }
 
             foreach ($peminjaman->detailPinjam as $detail) {

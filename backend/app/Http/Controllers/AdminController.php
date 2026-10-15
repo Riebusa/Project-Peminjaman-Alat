@@ -118,7 +118,13 @@ class AdminController extends Controller
     {
         $alat = Alat::findOrFail($id);
         $kategoris = Kategori::all();
-        return view('admin.alat.edit', compact('alat', 'kategoris'));
+
+        // Unit yang sedang di tangan peminjam (tidak termasuk dalam angka stok)
+        $sedangDipinjam = (int) DetailPinjam::where('alat_id', $alat->id)
+            ->whereHas('peminjaman', fn ($q) => $q->whereIn('status', ['dipinjam', 'telat', 'menunggu_pengembalian']))
+            ->sum('jumlah');
+
+        return view('admin.alat.edit', compact('alat', 'kategoris', 'sedangDipinjam'));
     }
 
     // Memperbarui data alat
@@ -188,7 +194,11 @@ class AdminController extends Controller
     {
         $search = $request->input('search');
 
-        $users = User::when($search, function ($query, $search) {
+        $users = User::withCount([
+                'peminjaman as pengajuan_menunggu' => fn ($q) => $q->where('status', 'diajukan'),
+                'peminjaman as pinjaman_berjalan'  => fn ($q) => $q->whereIn('status', ['dipinjam', 'telat', 'menunggu_pengembalian']),
+            ])
+            ->when($search, function ($query, $search) {
                 return $query->where('name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
                     ->orWhere('role', 'like', "%{$search}%");
@@ -336,7 +346,7 @@ class AdminController extends Controller
     }
 
     // Mengaktifkan / menonaktifkan akun user
-    public function toggleAktifUser($id)
+    public function toggleAktifUser($id, PeminjamanService $service)
     {
         // Pencegahan: Admin tidak boleh menonaktifkan akunnya sendiri
         if ((int) $id === auth()->id()) {
@@ -348,9 +358,26 @@ class AdminController extends Controller
         $user->is_active = !$user->is_active;
         $user->save();
 
-        $pesan = $user->is_active
-            ? "Akun {$user->name} berhasil diaktifkan kembali."
-            : "Akun {$user->name} berhasil dinonaktifkan. User tidak dapat login lagi.";
+        if ($user->is_active) {
+            return redirect()->back()->with('success', "Akun {$user->name} berhasil diaktifkan kembali.");
+        }
+
+        // Dinonaktifkan: tolak otomatis pengajuan yang masih menunggu persetujuan
+        $ditolak = 0;
+        $idPengajuan = Peminjaman::where('user_id', $user->id)->where('status', 'diajukan')->pluck('id');
+        foreach ($idPengajuan as $idPinjam) {
+            try {
+                $service->tolak((int) $idPinjam);
+                $ditolak++;
+            } catch (\Exception $e) {
+                // Sudah diproses petugas pada saat yang sama, lewati
+            }
+        }
+
+        $pesan = "Akun {$user->name} berhasil dinonaktifkan. User tidak dapat login lagi.";
+        if ($ditolak > 0) {
+            $pesan .= " {$ditolak} pengajuan yang menunggu persetujuan otomatis ditolak.";
+        }
 
         return redirect()->back()->with('success', $pesan);
     }

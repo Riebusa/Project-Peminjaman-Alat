@@ -125,8 +125,20 @@
                                     </a>
 
                                     <!-- Tombol Aktifkan / Nonaktifkan -->
+                                    @php
+                                        $pesanKonfirmasi = 'Aktifkan kembali akun ini?';
+                                        if ($user->is_active) {
+                                            $pesanKonfirmasi = 'Nonaktifkan akun ini? User tidak akan bisa login.';
+                                            if ($user->pengajuan_menunggu > 0) {
+                                                $pesanKonfirmasi .= " {$user->pengajuan_menunggu} pengajuan yang menunggu persetujuan akan otomatis ditolak.";
+                                            }
+                                            if ($user->pinjaman_berjalan > 0) {
+                                                $pesanKonfirmasi .= " {$user->pinjaman_berjalan} peminjaman yang sedang berjalan tetap bisa diproses petugas.";
+                                            }
+                                        }
+                                    @endphp
                                     <form action="{{ route('admin.user.toggle', $user->id) }}" method="POST"
-                                          onsubmit="return confirm('{{ $user->is_active ? 'Nonaktifkan akun ini? User tidak akan bisa login.' : 'Aktifkan kembali akun ini?' }}')">
+                                          onsubmit="return confirm(@js($pesanKonfirmasi))">
                                         @csrf
                                         @method('PATCH')
                                         @if($user->is_active)

@@ -7,7 +7,9 @@ use App\Models\DetailPinjam;
 use App\Models\Kategori;
 use App\Models\Peminjaman;
 use App\Models\Pengembalian;
+use App\Models\User;
 use App\Services\PeminjamanService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -75,13 +77,15 @@ class PeminjamController extends Controller
     {
         $jumlahAlat = is_array($request->alat_id) ? count($request->alat_id) : 0;
 
+        // Keberadaan alat dan stok diperiksa di dalam transaksi (bukan lewat aturan 'exists'),
+        // supaya keranjang yang basi bisa dikoreksi, bukan sekadar ditolak.
         $request->validate([
             'tgl_kembali_plan' => [
                 'required', 'date', 'after_or_equal:today',
                 'before_or_equal:' . today()->addDays(self::MAKS_HARI_PINJAM)->toDateString(),
             ],
             'alat_id'   => ['required', 'array', 'min:1', 'max:' . self::MAKS_JENIS_ALAT],
-            'alat_id.*' => ['required', 'integer', 'distinct', 'exists:alat,id'],
+            'alat_id.*' => ['required', 'integer', 'distinct'],
             'jumlah'    => ['required', 'array', 'size:' . $jumlahAlat],
             'jumlah.*'  => ['required', 'integer', 'min:1'],
         ], [
@@ -89,22 +93,62 @@ class PeminjamController extends Controller
             'tgl_kembali_plan.before_or_equal' => 'Lama peminjaman maksimal ' . self::MAKS_HARI_PINJAM . ' hari.',
             'alat_id.required'                 => 'Keranjang masih kosong. Tambahkan alat terlebih dahulu.',
             'alat_id.max'                      => 'Maksimal ' . self::MAKS_JENIS_ALAT . ' jenis alat dalam satu pengajuan.',
-            'alat_id.*.exists'                 => 'Alat yang dipilih tidak ditemukan.',
             'alat_id.*.distinct'               => 'Alat yang sama tidak boleh dipilih dua kali.',
             'jumlah.*.integer'                 => 'Jumlah pinjam harus berupa angka bulat.',
             'jumlah.*.min'                     => 'Jumlah pinjam minimal 1.',
         ]);
 
-        // Aturan: tidak boleh mengajukan baru jika ada yang terlambat / pengajuan menumpuk
-        if ($alasan = $this->alasanBlokir()) {
-            return redirect()->back()->with('error', $alasan);
-        }
-
         $daftarAlat = array_values($request->alat_id);
         $daftarJumlah = array_values($request->jumlah);
 
+        // Koreksi yang dikirim balik ke keranjang di browser bila ada alat bermasalah
+        $koreksi = ['hapus' => [], 'stok' => []];
+
         DB::beginTransaction();
         try {
+            // Kunci baris user ini supaya pengajuan bersamaan dari akun yang sama diproses berurutan
+            User::where('id', auth()->id())->lockForUpdate()->first();
+
+            // Aturan: tidak boleh mengajukan baru jika ada yang terlambat / pengajuan menumpuk
+            if ($alasan = $this->alasanBlokir()) {
+                DB::rollback();
+                return redirect()->back()->withInput()->with('error', $alasan);
+            }
+
+            // Periksa semua alat sekaligus supaya semua masalah terlaporkan dalam satu kali coba
+            $masalah = [];
+            $siapDisimpan = [];
+
+            foreach ($daftarAlat as $index => $alatId) {
+                $jumlahPinjam = (int) $daftarJumlah[$index];
+
+                $alat = Alat::lockForUpdate()->find($alatId);
+
+                if (!$alat) {
+                    $koreksi['hapus'][] = (int) $alatId;
+                    $masalah[] = 'ada alat yang sudah tidak tersedia';
+                    continue;
+                }
+
+                if (strtolower(trim($alat->status_kondisi)) !== self::KONDISI_BISA_DIPINJAM) {
+                    $koreksi['hapus'][] = (int) $alat->id;
+                    $masalah[] = "'{$alat->nama_alat}' sedang tidak bisa dipinjam";
+                    continue;
+                }
+
+                if ($alat->stok < $jumlahPinjam) {
+                    $koreksi['stok'][(int) $alat->id] = (int) $alat->stok;
+                    $masalah[] = "stok '{$alat->nama_alat}' tidak mencukupi (tersedia {$alat->stok})";
+                    continue;
+                }
+
+                $siapDisimpan[] = [$alat, $jumlahPinjam];
+            }
+
+            if (!empty($masalah)) {
+                throw new \DomainException('Keranjang sudah disesuaikan: ' . implode('; ', $masalah) . '. Periksa kembali lalu ajukan lagi.');
+            }
+
             // Buat header peminjaman dengan status awal 'diajukan'
             $peminjaman = Peminjaman::create([
                 'user_id' => auth()->id(),
@@ -113,19 +157,7 @@ class PeminjamController extends Controller
                 'status' => 'diajukan',
             ]);
 
-            foreach ($daftarAlat as $index => $alatId) {
-                $jumlahPinjam = (int) $daftarJumlah[$index];
-
-                $alat = Alat::lockForUpdate()->findOrFail($alatId);
-
-                if (strtolower(trim($alat->status_kondisi)) !== self::KONDISI_BISA_DIPINJAM) {
-                    throw new \Exception("Alat '{$alat->nama_alat}' sedang tidak bisa dipinjam.");
-                }
-
-                if ($alat->stok < $jumlahPinjam) {
-                    throw new \Exception("Stok alat '{$alat->nama_alat}' tidak mencukupi (tersedia {$alat->stok}).");
-                }
-
+            foreach ($siapDisimpan as [$alat, $jumlahPinjam]) {
                 DetailPinjam::create([
                     'peminjaman_id' => $peminjaman->id,
                     'alat_id' => $alat->id,
@@ -139,9 +171,14 @@ class PeminjamController extends Controller
             return redirect()->route('peminjam.riwayat')
                 ->with('success', 'Pengajuan peminjaman berhasil dikirim! Menunggu persetujuan Petugas.')
                 ->with('kosongkan_keranjang', true);
+        } catch (\DomainException $e) {
+            DB::rollback();
+            return redirect()->back()->withInput()
+                ->with('error', $e->getMessage())
+                ->with('koreksi_keranjang', $koreksi);
         } catch (\Exception $e) {
             DB::rollback();
-            return redirect()->back()->with('error', 'Gagal mengajukan peminjaman: ' . $e->getMessage());
+            return redirect()->back()->withInput()->with('error', 'Gagal mengajukan peminjaman: ' . $e->getMessage());
         }
     }
 
@@ -174,19 +211,29 @@ class PeminjamController extends Controller
     // 4. Peminjam mengkonfirmasi bahwa barang ingin dikembalikan (Notifikasi ke Petugas)
     public function prosesPengembalian(Request $request, $id)
     {
-        $peminjaman = Peminjaman::where('id', $id)
-            ->where('user_id', auth()->id())
-            ->whereIn('status', ['dipinjam', 'telat']) // Yang bisa dikembalikan hanya yang berstatus ini
-            ->firstOrFail();
-
+        DB::beginTransaction();
         try {
-            // HANYA ubah status menjadi menunggu konfirmasi petugas
-            $peminjaman->update([
-                'status' => 'menunggu_pengembalian'
-            ]);
+            $peminjaman = Peminjaman::where('id', $id)
+                ->where('user_id', auth()->id())
+                ->lockForUpdate()
+                ->firstOrFail();
 
+            // Status dibaca setelah baris dikunci: kalau petugas sudah memprosesnya, permintaan ditolak
+            if (!in_array($peminjaman->status, ['dipinjam', 'telat'], true)) {
+                DB::rollback();
+                return redirect()->back()->with('error', 'Pengembalian tidak bisa diajukan untuk transaksi berstatus ' . str_replace('_', ' ', $peminjaman->status) . '.');
+            }
+
+            // HANYA ubah status menjadi menunggu konfirmasi petugas
+            $peminjaman->update(['status' => 'menunggu_pengembalian']);
+
+            DB::commit();
             return redirect()->back()->with('success', 'Pengajuan pengembalian terkirim! Silakan serahkan alat fisik ke loket Petugas.');
+        } catch (ModelNotFoundException $e) {
+            DB::rollback();
+            return redirect()->back()->with('error', 'Transaksi tidak ditemukan.');
         } catch (\Exception $e) {
+            DB::rollback();
             return redirect()->back()->with('error', 'Gagal memproses pengembalian: ' . $e->getMessage());
         }
     }
@@ -194,22 +241,29 @@ class PeminjamController extends Controller
     // 5. Membatalkan pengajuan peminjaman (Hanya jika statusnya masih 'diajukan')
     public function batalkanPeminjaman($id)
     {
-        // Pastikan data milik user tersebut dan statusnya benar-benar MASIH 'diajukan'
-        $peminjaman = Peminjaman::where('id', $id)
-            ->where('user_id', auth()->id())
-            ->where('status', 'diajukan')
-            ->firstOrFail();
-
         DB::beginTransaction();
         try {
-            // Hapus detail peminjaman terlebih dahulu
-            $peminjaman->detailPinjam()->delete();
+            // Pastikan data milik user tersebut, lalu kunci barisnya
+            $peminjaman = Peminjaman::where('id', $id)
+                ->where('user_id', auth()->id())
+                ->lockForUpdate()
+                ->firstOrFail();
 
-            // Hapus data utama peminjaman
+            // Status dibaca setelah baris dikunci: kalau petugas sudah memproses, pembatalan ditolak
+            if ($peminjaman->status !== 'diajukan') {
+                DB::rollback();
+                return redirect()->back()->with('error', 'Pengajuan ini sudah diproses petugas sehingga tidak bisa dibatalkan.');
+            }
+
+            // Hapus detail peminjaman terlebih dahulu, lalu data utamanya
+            $peminjaman->detailPinjam()->delete();
             $peminjaman->delete();
 
             DB::commit();
             return redirect()->back()->with('success', 'Pengajuan peminjaman berhasil dibatalkan dan dihapus.');
+        } catch (ModelNotFoundException $e) {
+            DB::rollback();
+            return redirect()->back()->with('error', 'Pengajuan tidak ditemukan (mungkin sudah dibatalkan).');
         } catch (\Exception $e) {
             DB::rollback();
             return redirect()->back()->with('error', 'Gagal membatalkan peminjaman: ' . $e->getMessage());

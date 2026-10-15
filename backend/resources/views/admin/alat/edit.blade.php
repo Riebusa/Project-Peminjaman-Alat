@@ -82,6 +82,12 @@
                 <label class="block text-gray-700 text-sm font-semibold mb-2">Stok</label>
                 <input type="number" name="stok" value="{{ old('stok', $alat->stok) }}" min="0" required
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <p class="text-xs text-gray-500 mt-1">
+                    Stok adalah jumlah unit yang tersedia di rak.
+                    @if($sedangDipinjam > 0)
+                        Saat ini <strong>{{ $sedangDipinjam }} unit</strong> sedang dipinjam dan tidak termasuk angka ini.
+                    @endif
+                </p>
             </div>
             <div>
                 <label class="block text-gray-700 text-sm font-semibold mb-2">Status Kondisi</label>
